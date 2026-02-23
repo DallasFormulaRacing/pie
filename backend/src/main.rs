@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
         println!("Writing on vcan0");
         socket_tx.write_frame(frame).await?;
 
-        println!("Waiting 3 seconds");
-        Delay::new(Duration::from_secs(3)).await;
+        println!("Waiting 1 seconds");
+        Delay::new(Duration::from_secs(1)).await;
     }
 }
