@@ -10,6 +10,7 @@ export function useDaqSocket(url: string) {
     socket.current = new WebSocket(url);
 
     socket.current.onmessage = (event) => {
+      console.log("RAW DATA FROM RUST:", event.data);
       const update: UiUpdate = JSON.parse(event.data);
       
       switch (update.type) {

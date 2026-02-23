@@ -1,5 +1,6 @@
 services:
   backend:
+    container_name: "can-bridge"
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -9,6 +10,7 @@ services:
     network_mode: "host"
 
   gui:
+    container_name: "gui"
     build:
       context: ./gui
       dockerfile: Dockerfile

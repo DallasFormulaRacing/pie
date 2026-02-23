@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import type { UiCommand } from "@/types/daq";
 export function DaqMonitor() {
-  const { nodes, sendCommand } = useDaqSocket("ws://pi.local:8080");
-
+  const { nodes, sendCommand } = useDaqSocket(`ws://${window.location.hostname}:8080`);
   const nodeNames = ["FL_NODE", "FR_NODE", "RL_NODE", "RR_NODE", "NUC_1", "NUC_2", "PDM_01"];
 
   return (
