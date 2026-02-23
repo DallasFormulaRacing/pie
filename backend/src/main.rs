@@ -1,4 +1,6 @@
-// socketcan/examples/smol_print_frames.rs
+// socketcan/examples/tokio_send.rs
+//
+// Example application for using Tokio with socketcan-rs.
 //
 // This file is part of the Rust 'socketcan-rs' library.
 //
@@ -8,31 +10,28 @@
 // to those terms.
 //
 
-//! A SocketCAN example using smol.
+//! A SocketCAN example using tokio.
 //!
-//! This receives CAN frames and prints them to the console.
+//! This sends data frames to the CANbus.
 //!
 
-use socketcan::{smol::CanSocket, CanFrame, Error, Result};
-use std::env;
+use embedded_can::{Frame, StandardId};
+use futures_timer::Delay;
+use socketcan::{tokio::CanSocket, CanFrame, Result};
+use std::time::Duration;
 
-fn main() -> Result<()> {
-    smol::block_on(async {
-        let iface = env::args().nth(1).unwrap_or_else(|| "vcan0".into());
-        let sock = CanSocket::open(&iface)?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    let socket_tx = CanSocket::open("vcan0").unwrap();
 
-        println!("Reading on {}", iface);
+    loop {
+        let id = StandardId::new(0x100).unwrap();
+        let frame = CanFrame::new(id, &[0]).unwrap();
 
-        loop {
-            match sock.read_frame().await {
-                Ok(CanFrame::Data(frame)) => println!("{:?}", frame),
-                Ok(CanFrame::Remote(frame)) => println!("{:?}", frame),
-                Ok(CanFrame::Error(frame)) => println!("{:?}", frame),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
+        println!("Writing on vcan0");
+        socket_tx.write_frame(frame).await?;
 
-        #[allow(unreachable_code)]
-        Ok::<(), Error>(())
-    })
+        println!("Waiting 3 seconds");
+        Delay::new(Duration::from_secs(3)).await;
+    }
 }

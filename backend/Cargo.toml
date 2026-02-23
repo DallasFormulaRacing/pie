@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-smol = "2.0.2"
-socketcan = {version = "3.5.0"}
+embedded-can = "0.4"
+futures-timer = "3.0"
+socketcan = { version = "3.4", features = ["tokio"] }
+tokio = { version = "1", features = ["full"] }
