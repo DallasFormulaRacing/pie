@@ -1,19 +1,18 @@
 services:
-  backend:
-    container_name: "can-bridge"
+  can-bridge:
+    container_name: can-bridge
     build:
-      context: ./backend
+      context: ./can-bridge
       dockerfile: Dockerfile
-    image: daq-backend:latest
-    ports:
-      - "8080:8080"
-    network_mode: "host"
+    image: ghcr.io/schommie/ev-can-bridge:latest
+    network_mode: host
+    restart: unless-stopped
 
   gui:
-    container_name: "gui"
+    container_name: gui
     build:
       context: ./gui
       dockerfile: Dockerfile
-    image: daq-gui:latest
-    ports:
-      - "8080:80"
+    image: ghcr.io/schommie/ev-gui:latest
+    network_mode: host
+    restart: unless-stopped

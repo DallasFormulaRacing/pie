@@ -1,0 +1,25 @@
+services:
+  can-bridge:
+    build:
+      context: ./can-bridge
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./can-bridge:/app
+      - cargo-cache:/usr/local/cargo/registry
+      - bridge-target:/app/target
+    network_mode: host
+
+  gui:
+    build:
+      context: ./gui
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./gui:/app
+      - gui-node-modules:/app/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  cargo-cache:
+  bridge-target:
+  gui-node-modules:
