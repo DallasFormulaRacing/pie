@@ -28,7 +28,7 @@ impl DfrCanId {
         })
     }
 
-    /// Packs the struct back into a 29-bit raw CAN identifier
+    // Packs the struct back into a 29-bit raw CAN identifier
     pub fn to_raw_id(&self) -> u32 {
         ((self.priority as u32) << 26)
             | ((self.target as u32) << 21)
@@ -37,71 +37,7 @@ impl DfrCanId {
     }
 }
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u16)]
-pub enum BootloaderCommand {
-    Ping = 0x40,
-    Erase = 0x45,
-    EraseOk = 0x46,
-    Write = 0x47,
-    WriteOk = 0x48,
-    AddressAndSize = 0x4A,
-    FirmwareUpdateQuery = 0x4B,
-    FirmwareUpdateResponse = 0x4C,
-    Reboot = 0x4D,
-    Jump = 0xAAAA,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u16)]
-pub enum CanDevices {
-    RaspberryPi = 0x01,
-    Bms = 0x03,
-    Nuc1 = 0x06,
-    Nuc2 = 0x07,
-    FrontLeft = 0x08,
-    FrontRight = 0x09,
-    RearLeft = 0x0A,
-    RearRight = 0x0B,
-    Unknown = 0x1F,
-}
-
-impl TryFrom<u16> for CanDevices {
-    type Error = ();
-    fn try_from(v: u16) -> Result<Self, Self::Error> {
-        match v {
-            0x01 => Ok(Self::RaspberryPi),
-            0x03 => Ok(Self::Bms),
-            0x06 => Ok(Self::Nuc1),
-            0x07 => Ok(Self::Nuc2),
-            0x08 => Ok(Self::FrontLeft),
-            0x09 => Ok(Self::FrontRight),
-            0x0A => Ok(Self::RearLeft),
-            0x0B => Ok(Self::RearRight),
-            _ => Err(()),
-        }
-    }
-}
-
-impl CanDevices {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::RaspberryPi => "Raspberry Pi",
-            Self::Bms => "BMS",
-            Self::Nuc1 => "NUC 1",
-            Self::Nuc2 => "NUC 2",
-            Self::FrontLeft => "Front Left",
-            Self::FrontRight => "Front Right",
-            Self::RearLeft => "Rear Left",
-            Self::RearRight => "Rear Right",
-            Self::Unknown => "Unknown",
-        }
-    }
-}
-
 pub fn parse_can_id(raw_id: u32) -> DfrCanId {
-    // raw_id (29 bits) = [priority 3b][target 5b][command 16b][source 5b]
     let priority = ((raw_id >> 26) & 0x07) as u16;
     let target = ((raw_id >> 21) & 0x1F) as u16;
     let command = ((raw_id >> 5) & 0xFFFF) as u16;
@@ -115,27 +51,82 @@ pub fn parse_can_id(raw_id: u32) -> DfrCanId {
     }
 }
 
-impl TryFrom<u16> for BootloaderCommand {
-    type Error = ();
-    fn try_from(v: u16) -> Result<Self, Self::Error> {
-        match v {
-            x if x == BootloaderCommand::Ping as u16 => Ok(BootloaderCommand::Ping),
-            x if x == BootloaderCommand::Erase as u16 => Ok(BootloaderCommand::Erase),
-            x if x == BootloaderCommand::EraseOk as u16 => Ok(BootloaderCommand::EraseOk),
-            x if x == BootloaderCommand::AddressAndSize as u16 => Ok(BootloaderCommand::AddressAndSize),
-            x if x == BootloaderCommand::Write as u16 => Ok(BootloaderCommand::Write),
-            x if x == BootloaderCommand::WriteOk as u16 => Ok(BootloaderCommand::WriteOk),
-            x if x == BootloaderCommand::FirmwareUpdateQuery as u16 => Ok(BootloaderCommand::FirmwareUpdateQuery),
-            x if x == BootloaderCommand::FirmwareUpdateResponse as u16 => Ok(BootloaderCommand::FirmwareUpdateResponse),
-            x if x == BootloaderCommand::Reboot as u16 => Ok(BootloaderCommand::Reboot),
-            x if x == BootloaderCommand::Jump as u16 => Ok(BootloaderCommand::Jump),
-            _ => Err(()),
-        }
+
+pub const NODE_ID_UNKNOWN: u16 = 0x00;
+pub const NODE_ID_ALL_NODES: u16 = 0x01;
+pub const NODE_ID_FRONT_LEFT: u16 = 0x02;
+pub const NODE_ID_FRONT_RIGHT: u16 = 0x03;
+pub const NODE_ID_REAR_LEFT: u16 = 0x04;
+pub const NODE_ID_REAR_RIGHT: u16 = 0x05;
+pub const NODE_ID_NUCLEO_1: u16 = 0x06;
+pub const NODE_ID_NUCLEO_2: u16 = 0x07;
+pub const NODE_ID_DASH: u16 = 0x1D;
+pub const NODE_ID_RASPI: u16 = 0x1E;
+pub const NODE_ID_BMS: u16 = 0x1F;
+
+// All bus devices
+pub const ALL_DEVICE_IDS: &[u16] = &[
+    NODE_ID_FRONT_LEFT,
+    NODE_ID_FRONT_RIGHT,
+    NODE_ID_REAR_LEFT,
+    NODE_ID_REAR_RIGHT,
+    NODE_ID_NUCLEO_1,
+    NODE_ID_NUCLEO_2,
+    NODE_ID_DASH,
+    NODE_ID_BMS,
+];
+
+pub fn device_name(id: u16) -> &'static str {
+    match id {
+        NODE_ID_UNKNOWN => "Unknown",
+        NODE_ID_ALL_NODES => "All Nodes",
+        NODE_ID_FRONT_LEFT => "Front Left",
+        NODE_ID_FRONT_RIGHT => "Front Right",
+        NODE_ID_REAR_LEFT => "Rear Left",
+        NODE_ID_REAR_RIGHT => "Rear Right",
+        NODE_ID_NUCLEO_1 => "NUC 1",
+        NODE_ID_NUCLEO_2 => "NUC 2",
+        NODE_ID_DASH => "Dash",
+        NODE_ID_RASPI => "Raspberry Pi",
+        NODE_ID_BMS => "BMS",
+        _ => "Unknown",
     }
 }
 
-impl From<BootloaderCommand> for u16 {
-    fn from(cmd: BootloaderCommand) -> Self {
-        cmd as u16
+// App commands
+pub const CMD_ID_PING: u16 = 0x001;
+pub const CMD_ID_PONG: u16 = 0x060;
+pub const CMD_ID_REQ_DATA: u16 = 0x050;
+pub const CMD_ID_SENDING_DATA: u16 = 0x051;
+pub const CMD_ID_RESET_NODE: u16 = 0x099;
+pub const CMD_ID_SET_LED: u16 = 0x100;
+pub const CMD_ID_SET_FREQ: u16 = 0x101;
+
+// BL Commands
+pub const BL_CMD_PING: u16 = 0x040;
+pub const BL_CMD_ERASE: u16 = 0x045;
+pub const BL_CMD_ERASE_OK: u16 = 0x046;
+pub const BL_CMD_WRITE: u16 = 0x047;
+pub const BL_CMD_WRITE_OK: u16 = 0x048;
+pub const BL_CMD_ADDR_SIZE: u16 = 0x04A;
+pub const BL_CMD_FW_QUERY: u16 = 0x04B;
+pub const BL_CMD_FW_RESPONSE: u16 = 0x04C;
+pub const BL_CMD_REBOOT: u16 = 0x04D;
+pub const BL_CMD_JUMP: u16 = 0xAAAA;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceMode {
+    Bootloader,
+    Application,
+}
+
+impl DeviceMode {
+    pub fn from_ping_response(data: &[u8]) -> Self {
+        if data.first() == Some(&1) {
+            Self::Application
+        } else {
+            Self::Bootloader
+        }
     }
 }
