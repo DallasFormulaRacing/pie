@@ -25,6 +25,7 @@ pub enum GuiMessage {
     PingResult {
         device_id: u16,
         online: bool,
+        mode: Option<String>,
         rtt_ms: Option<f32>,
     },
 
@@ -47,6 +48,7 @@ pub struct DeviceStatus {
     pub device_id: u16,
     pub name: String,
     pub online: bool,
+    pub mode: String,
 }
 
 impl GuiRequest {
