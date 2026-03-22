@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   BackendMessage,
+  SensorReading,
   DeviceStatus,
   FrontendCommand,
 } from "../types/backend";
@@ -9,6 +10,7 @@ const RECONNECT_INTERVAL_MS = 2000;
 
 export function useDaqSocket(url: string) {
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
+  const [data, setData] = useState<SensorReading>();
   const [connected, setConnected] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,7 +34,7 @@ export function useDaqSocket(url: string) {
           setDevices(msg.devices);
           break;
         case "sensorData":
-          // TODO: route to graph components
+          setData(msg.sensors)
           break;
         case "pingResult":
           break;
