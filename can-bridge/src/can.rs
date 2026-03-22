@@ -27,11 +27,13 @@ impl CanWriter {
     pub fn send_frame(&self, priority: u16, target: u16, command: u16, source: u16, data: &[u8]) -> anyhow::Result<()> {
         let id = DfrCanId::new(priority, target, command, source)
             .map_err(|e| anyhow::format_err!("{}", e))?;
-        let ext_id = embedded_can::ExtendedId::new(id.to_raw_id()).unwrap();
-        if let Some(frame) = CanFdFrame::with_flags(ext_id, data, FdFlags::empty()) {
-            let sock = self.socket.lock().unwrap();
-            sock.write_frame(&frame)?;
-        }
+        let ext_id = embedded_can::ExtendedId::new(id.to_raw_id())
+            .ok_or_else(|| anyhow::format_err!("Invalid extended CAN ID"))?;
+        let frame = CanFdFrame::with_flags(ext_id, data, FdFlags::empty())
+            .ok_or_else(|| anyhow::format_err!("Invalid CAN FD frame (len={})", data.len()))?; 
+        let sock = self.socket.lock().map_err(|_| anyhow::format_err!("Invalid socket"));
+        sock?.write_frame(&frame)?;
+        
         Ok(())
     }
 
@@ -48,7 +50,7 @@ impl CanWriter {
 pub fn start_reader_thread(
     interface: &str,
     tracker: DeviceTracker,
-    _gui_tx: tokio::sync::broadcast::Sender<GuiMessage>,
+    gui_tx: tokio::sync::broadcast::Sender<GuiMessage>,
 ) -> anyhow::Result<()> {
     let socket = CanFdSocket::open(interface)?;
     socket.set_read_timeout(Duration::from_millis(100))?;
@@ -64,7 +66,7 @@ pub fn start_reader_thread(
                     };
                     let id = canprotocol::parse_can_id(ext_id.as_raw());
                     let data = frame.data();
-                    handle_can_frame(&id, data, &tracker);
+                    handle_can_frame(&id, data, &tracker, &gui_tx);
                 }
                 Ok(_) => {
                 }
@@ -85,11 +87,17 @@ fn handle_can_frame(
     id: &DfrCanId,
     data: &[u8],
     tracker: &DeviceTracker,
+    gui_tx: &tokio::sync::broadcast::Sender<GuiMessage>,
 ) {
     match id.command {
         BL_CMD_PING => {
             let mode = DeviceMode::from_ping_response(data);
             tracker.update_blocking(id.source, mode);
+
+            let devices = tracker.get_device_list();
+            let _ = gui_tx.send(GuiMessage::DeviceList {devices});
+            println!("did smth idk");
+
             debug!(
                 "Ping response from 0x{:02X} ({}): {:?}",
                 id.source,
@@ -105,7 +113,6 @@ fn handle_can_frame(
         }
     }
 }
-
 
 pub async fn ping_sender_task(writer: CanWriter, interval_ms: u64) {
     let mut interval = tokio::time::interval(Duration::from_millis(interval_ms));

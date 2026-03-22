@@ -5,7 +5,7 @@ import { LiveTestGraph } from "@/components/Graph";
 import { Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const WS_URL = `ws://${window.location.hostname}:9002`;
+const WS_URL = `ws://0.0.0.0:9002`;
 
 export function DaqMonitor() {
   const { devices, connected, sendCommand } = useDaqSocket(WS_URL);

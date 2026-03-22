@@ -39,11 +39,11 @@ def generate_fake_cell_frame():
 
 # 64 bytes, 4 byte padding, 1 byte per temp
 def generate_fake_temp_frame():
-    return 0
+    return bytes([0]*8)
 
 # 24 bytes, 2, 2, 2, 18
 def generate_fake_pack_frame():
-    return 0
+    return bytes([0]*8)
 
 def f2i(n: float):
     return fixedint.Int16(n/0.00015 - 1.5)
@@ -56,7 +56,7 @@ def generate_fake_cell_value():
 #return uint8_t
 def generate_fake_temp_value():
     random.randint(2900, 4100)  
-    return 0
+    return bytes([0]*8)
 
 try:
     while True:

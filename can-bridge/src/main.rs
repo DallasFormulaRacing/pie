@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::Message;
 const BROADCAST_CAPACITY: usize = 64;
 const PING_INTERVAL_MS: u64 = 1000;
 const DEVICE_LIST_BROADCAST_MS: u64 = 1000;
-const CAN_INTERFACE: &str = "can0";
+const CAN_INTERFACE: &str = "vcan0";
 
 #[tokio::main]
 async fn main() {
@@ -38,14 +38,14 @@ async fn main() {
         }
     };
 
-
-    if let Some(ref _writer) = can_writer {
+    if let Some(_writer) = &can_writer {
         if let Err(e) = can::start_reader_thread(CAN_INTERFACE, tracker.clone(), gui_tx.clone()) {
             error!("Failed to start CAN reader: {}", e);
         }
+        info!("CAN reader thread started");
     }
 
-    if let Some(ref writer) = can_writer {
+    if let Some(writer) = &can_writer {
         tokio::spawn(can::ping_sender_task(writer.clone(), PING_INTERVAL_MS));
     }
 
@@ -78,6 +78,7 @@ async fn handle_client(
     tracker: DeviceTracker,
     can_writer: Option<CanWriter>,
 ) {
+    info!("handle_client");
     let ws = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
@@ -94,6 +95,7 @@ async fn handle_client(
             msg = gui_rx.recv() => {
                 match msg {
                     Ok(gui_msg) => {
+                        info!("Received gui_msg");
                         if ws_tx.send(Message::text(gui_msg.to_text())).await.is_err() {
                             break;
                         }
@@ -109,7 +111,10 @@ async fn handle_client(
                 match msg {
                     Some(Ok(Message::Text(text))) => {
                         match GuiRequest::from_text(&text) {
-                            Ok(req) => handle_gui_request(req, addr, &mut ws_tx, &tracker, &can_writer).await,
+                            Ok(req) => {
+                                info!("Received req");
+                                handle_gui_request(req, addr, &mut ws_tx, &tracker, &can_writer).await;
+                            }
                             Err(e) => {
                                 warn!("{} sent invalid request: {}", addr, e);
                                 let err = GuiMessage::Error {
