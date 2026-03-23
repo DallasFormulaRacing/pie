@@ -95,7 +95,6 @@ async fn handle_client(
             msg = gui_rx.recv() => {
                 match msg {
                     Ok(gui_msg) => {
-                        info!("Received gui_msg");
                         if ws_tx.send(Message::text(gui_msg.to_text())).await.is_err() {
                             break;
                         }
@@ -112,7 +111,6 @@ async fn handle_client(
                     Some(Ok(Message::Text(text))) => {
                         match GuiRequest::from_text(&text) {
                             Ok(req) => {
-                                info!("Received req");
                                 handle_gui_request(req, addr, &mut ws_tx, &tracker, &can_writer).await;
                             }
                             Err(e) => {

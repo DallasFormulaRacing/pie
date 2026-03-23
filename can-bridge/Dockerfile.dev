@@ -1,4 +1,5 @@
 FROM rust:slim
 WORKDIR /app
 RUN cargo install cargo-watch
+ENV RUST_LOG=info
 CMD ["cargo", "watch", "-x", "run"]

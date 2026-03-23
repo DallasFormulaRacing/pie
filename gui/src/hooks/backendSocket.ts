@@ -10,7 +10,7 @@ const RECONNECT_INTERVAL_MS = 2000;
 
 export function useDaqSocket(url: string) {
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
-  const [data, setData] = useState<SensorReading[]>();
+  const [data, setData] = useState<{ source: string; sensors: SensorReading[] } | undefined>();
   const [connected, setConnected] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,8 +35,9 @@ export function useDaqSocket(url: string) {
           console.log("Received deviceList");
           break;
         case "sensorData":
-          setData(msg.sensors);
-          console.log("Received sensorData");
+          setData({ source: msg.source, sensors: msg.sensors });
+          console.log("Received sensorData from", msg.source);
+          console.log("Data:", msg.sensors);
           break;
         case "pingResult":
           break;
@@ -71,5 +72,5 @@ export function useDaqSocket(url: string) {
     }
   }, []);
 
-  return { devices, connected, sendCommand };
+  return { devices, data, connected, sendCommand };
 }

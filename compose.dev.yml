@@ -8,6 +8,7 @@ services:
       - cargo-cache:/usr/local/cargo/registry
       - bridge-target:/app/target
     network_mode: host
+    privileged: true
 
   gui:
     build:
