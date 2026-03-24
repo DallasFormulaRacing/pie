@@ -7,6 +7,9 @@ import type { SensorReading } from "@/types/backend";
 
 const WS_URL = `ws://localhost:9002`;
 
+// this can be made nicer, kinda looks like it's 
+// lagging bc it waits for data before creating each accordion tab
+
 export function BmsMonitor() {
   const { data } = useDaqSocket(WS_URL);
   const [sensorGroups, setSensorGroups] = useState<Record<string, SensorReading[]>>({});
