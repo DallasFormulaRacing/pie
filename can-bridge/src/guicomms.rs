@@ -15,6 +15,7 @@ pub enum GuiRequest {
 pub enum GuiMessage {
     SensorData {
         source: String,
+        cmd: String,
         sensors: Vec<SensorReading>,
     },
 

@@ -11,28 +11,31 @@ import { Activity } from "lucide-react"
 interface GraphProps {
   title: string;
   description?: string; // The '?' means this is optional
+  sensorData?: { name: string; value: number; unit: string }[];
 }
 
-export const LiveTestGraph = ({ title, description = "Real-time DAQ feed" }: GraphProps) => {
-  const [data, setData] = React.useState<[number[], number[]]>([[], []]);
+export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", sensorData }: GraphProps) => {
+  const [data, setData] = React.useState<[number[], ...number[][]]>([[]]);
   
-  // (Simulation logic remains the same...)
   React.useEffect(() => {
-    const interval = setInterval(() => {
+    if (sensorData && sensorData.length > 0) {
       const now = Date.now() / 1000;
-      const randomVal = Math.floor(Math.random() * (9000 - 1000 + 1) + 1000);
-      setData(prev => [
-        [...prev[0], now].slice(-100),
-        [...prev[1], randomVal].slice(-100)
-      ]);
-    }, 100);
-    return () => clearInterval(interval);
-  }, []);
+      setData(prev => {
+        const newData: [number[], ...number[][]] = [ [...prev[0], now].slice(-100) ];
+        sensorData.forEach((sensor, index) => {
+          if (!newData[index + 1]) newData[index + 1] = [];
+          newData[index + 1] = [...(prev[index + 1] || []), sensor.value].slice(-100);
+        });
+        return newData;
+      });
+    }
+  }, [sensorData]);
 
+  const series = sensorData ? sensorData.map(sensor => ({ label: sensor.name, stroke: "oklch(0.646 0.222 41.116)", width: 2 })) : [];
   const options: uPlot.Options = {
-    width: 500, // Reduced slightly for 2-column grid
+    width: 500,
     height: 300,
-    series: [{}, { label: title, stroke: "oklch(0.646 0.222 41.116)", width: 2 }],
+    series: [{}, ...series],
     axes: [{ stroke: "oklch(0.553 0.013 58.071)" }, { stroke: "oklch(0.553 0.013 58.071)" }],
   };
 

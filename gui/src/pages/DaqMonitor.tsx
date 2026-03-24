@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const WS_URL = `ws://localhost:9002`;
 
 export function DaqMonitor() {
-  const { devices, connected, sendCommand } = useDaqSocket(WS_URL);
+  const { devices, data, connected, sendCommand } = useDaqSocket(WS_URL);
 
   return (
     <CommonLayout>
@@ -16,8 +16,9 @@ export function DaqMonitor() {
         {/* Left: Telemetry Graphs */}
         <div className="xl:col-span-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <LiveTestGraph
-            title="Wheel Speed"
-            description="Average Wheel Speed (km/h)"
+            title={data?.cmd || "Sensor Data"}
+            description={`Real-time ${data?.source || "DAQ"} feed`}
+            sensorData={data?.sensors}
           />
           <LiveTestGraph
             title="Lin Pot"

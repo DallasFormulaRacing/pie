@@ -8,9 +8,25 @@ import type {
 
 const RECONNECT_INTERVAL_MS = 2000;
 
+interface DfrCanId {
+  priority: number;
+  target: number;
+  command: number;
+  source: number;
+}
+
+function parseCanId(rawId: number): DfrCanId {
+  return {
+    priority: (rawId >> 26) & 0x07,
+    target: (rawId >> 21) & 0x1F,
+    command: (rawId >> 5) & 0xFFFF,
+    source: rawId & 0x1F,
+  };
+}
+
 export function useDaqSocket(url: string) {
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
-  const [data, setData] = useState<{ source: string; sensors: SensorReading[] } | undefined>();
+  const [data, setData] = useState<{ source: string; cmd: string; sensors: SensorReading[] } | undefined>();
   const [connected, setConnected] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,9 +51,8 @@ export function useDaqSocket(url: string) {
           console.log("Received deviceList");
           break;
         case "sensorData":
-          setData({ source: msg.source, sensors: msg.sensors });
-          console.log("Received sensorData from", msg.source);
-          console.log("Data:", msg.sensors);
+          console.log(msg.sensors)
+          setData({ source: msg.source, cmd: msg.cmd, sensors: msg.sensors });
           break;
         case "pingResult":
           break;

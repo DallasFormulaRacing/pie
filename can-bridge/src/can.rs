@@ -66,7 +66,7 @@ pub fn start_reader_thread(
                     };
                     let id = canprotocol::parse_can_id(ext_id.as_raw());
                     let data = frame.data();
-                    handle_can_frame(&id, data, &tracker, &gui_tx);
+                    handle_can_frame(&id, data, &tracker, &gui_tx, &ext_id);
                 }
                 Ok(_) => {
                 }
@@ -88,6 +88,7 @@ fn handle_can_frame(
     data: &[u8],
     tracker: &DeviceTracker,
     gui_tx: &tokio::sync::broadcast::Sender<GuiMessage>,
+    ext_id: &embedded_can::ExtendedId,
 ) {
     match id.command {
         BL_CMD_PING => {
@@ -107,28 +108,31 @@ fn handle_can_frame(
         canprotocol::CMD_ID_SENDING_DATA => {
             info!("Data from 0x{:02X}: {} bytes", id.source, data.len());
         }
-        0x0005 => {
+        canprotocol::CMD_ID_FIRST_24_CELLS 
+        | canprotocol::CMD_ID_SECOND_24_CELLS
+        | canprotocol::CMD_ID_THIRD_24_CELLS
+        | canprotocol::CMD_ID_FOURTH_24_CELLS
+        | canprotocol::CMD_ID_FIFTH_24_CELLS
+        | canprotocol::CMD_ID_SIXTH_24_CELLS => {
             if data.len() == 48 {
-                // Assume 24 cells, 2 bytes each, big endian
                 let mut sensors = Vec::new();
                 for i in 0..24 {
                     let val = ((data[i * 2] as u16) << 8) | (data[i * 2 + 1] as u16);
                     sensors.push(SensorReading {
                         name: Box::leak(format!("Cell {}", i + 1).into_boxed_str()),
-                        value: val as f32 / 1000.0, // assume mV to V
+                        value: val as f32 / 1000.0, 
                         unit: "V",
                     });
                 }
+                info!("Sending sensorData for command 0x{:04X} from 0x{:02X}", id.command, id.source);
                 let msg = GuiMessage::SensorData {
                     source: canprotocol::device_name(id.source).to_string(),
+                    cmd: canprotocol::cmd_name(id.command).to_string(),
                     sensors,
                 };
                 let _ = gui_tx.send(msg);
             }
-            info!("Simulator data from 0x{:02X}: {} bytes", id.source, data.len());
-        }
-        0x0006 => {
-            info!("Simulator data 2 from 0x{:02X}: {} bytes", id.source, data.len());
+            info!("Data from 0x{:02X}: {} bytes", id.source, data.len());
         }
         _ => {
             info!("Unhandled command 0x{:04X} from 0x{:02X}", id.command, id.source);

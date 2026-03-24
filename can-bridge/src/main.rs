@@ -74,7 +74,7 @@ async fn device_list_broadcaster(tracker: DeviceTracker, gui_tx: broadcast::Send
 async fn handle_client(
     stream: TcpStream,
     addr: SocketAddr,
-    gui_tx: broadcast::Sender<GuiMessage>,
+    gui_tx: broadcast::Sender<GuiMessage>, 
     tracker: DeviceTracker,
     can_writer: Option<CanWriter>,
 ) {

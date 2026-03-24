@@ -51,7 +51,7 @@ pub fn parse_can_id(raw_id: u32) -> DfrCanId {
     }
 }
 
-// src ids
+// src nodes
 pub const NODE_ID_UNKNOWN: u16 = 0x00;
 pub const NODE_ID_ALL_NODES: u16 = 0x01;
 pub const NODE_ID_FRONT_LEFT: u16 = 0x02;
@@ -63,16 +63,7 @@ pub const NODE_ID_NUCLEO_2: u16 = 0x07;
 pub const NODE_ID_DASH: u16 = 0x1D;
 pub const NODE_ID_RASPI: u16 = 0x1E;
 pub const NODE_ID_BMS: u16 = 0x1F;
-pub const CMD_ID_FIRST_24_CELLS: u16 = 0x00A0;
-pub const CMD_ID_SECOND_24_CELLS: u16 = 0x00A1;
-pub const CMD_ID_THIRD_24_CELLS: u16 = 0x00A2;
-pub const CMD_ID_FOURTH_24_CELLS: u16 = 0x00A3;
-pub const CMD_ID_FIFTH_24_CELLS: u16 = 0x00A4;
-pub const CMD_ID_SIXTH_24_CELLS: u16 = 0x00A5;
-pub const CMD_ID_FIRST_60_TEMPS: u16 = 0x00B0;
-pub const CMD_ID_LAST_60_TEMPS: u16 = 0x00B1;
-pub const CMD_ID_PACK_METADATA: u16 = 0x00C0;
-pub const CMD_ID_IMD_DATA: u16 = 0x00D0;
+
 
 // All bus devices
 pub const ALL_DEVICE_IDS: &[u16] = &[
@@ -123,6 +114,34 @@ pub const BL_CMD_FW_QUERY: u16 = 0x04B;
 pub const BL_CMD_FW_RESPONSE: u16 = 0x04C;
 pub const BL_CMD_REBOOT: u16 = 0x04D;
 pub const BL_CMD_JUMP: u16 = 0xAAAA;
+
+// Data Commands
+pub const CMD_ID_FIRST_24_CELLS: u16 = 0x00A0;
+pub const CMD_ID_SECOND_24_CELLS: u16 = 0x00A1;
+pub const CMD_ID_THIRD_24_CELLS: u16 = 0x00A2;
+pub const CMD_ID_FOURTH_24_CELLS: u16 = 0x00A3;
+pub const CMD_ID_FIFTH_24_CELLS: u16 = 0x00A4;
+pub const CMD_ID_SIXTH_24_CELLS: u16 = 0x00A5;
+pub const CMD_ID_FIRST_60_TEMPS: u16 = 0x00B0;
+pub const CMD_ID_LAST_60_TEMPS: u16 = 0x00B1;
+pub const CMD_ID_PACK_METADATA: u16 = 0x00C0;
+pub const CMD_ID_IMD_DATA: u16 = 0x00D0;
+
+pub fn cmd_name(id: u16) -> &'static str {
+    match id {
+        CMD_ID_FIRST_24_CELLS => "First 24 Cells",
+        CMD_ID_SECOND_24_CELLS => "Second 24 Cells",
+        CMD_ID_THIRD_24_CELLS => "Third 24 Cells",
+        CMD_ID_FOURTH_24_CELLS => "Fourth 24 Cells",
+        CMD_ID_FIFTH_24_CELLS => "Fifth 24 Cells",
+        CMD_ID_SIXTH_24_CELLS => "Sixth 24 Cells",
+        CMD_ID_FIRST_60_TEMPS => "First 60 Temps",
+        CMD_ID_LAST_60_TEMPS => "Last 60 Temps",
+        CMD_ID_PACK_METADATA => "Pack Metadata",
+        CMD_ID_IMD_DATA => "IMD Data",
+        _ => "Unknown",
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceMode {

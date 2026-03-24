@@ -1,6 +1,6 @@
 export type BackendMessage =
   | { type: "deviceList"; devices: DeviceStatus[] }
-  | { type: "sensorData"; source: string; sensors: SensorReading[] }
+  | { type: "sensorData"; source: string; cmd: string; sensors: SensorReading[] }
   | {
       type: "pingResult";
       deviceId: number;
