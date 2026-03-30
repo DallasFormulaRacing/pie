@@ -189,5 +189,22 @@ where
             let reply = GuiMessage::DeviceList { devices };
             let _ = ws_tx.send(Message::text(reply.to_text())).await;
         }
+
+        GuiRequest::SetParameters {voltage, current}=> {
+            if let Some(writer) = can_writer {
+                let writer = writer.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    writer.send_parameters(device_id)
+                }).await;
+                match result {
+                    Ok(Ok(())) => info!("Reboot sent to device 0x{:02X}", device_id),
+                    Ok(Err(e)) => warn!("Failed to send reboot to 0x{:02X}: {}", device_id, e),
+                    Err(e) => warn!("Spawn error: {}", e),
+                }
+            } else {
+                let err = GuiMessage::Error { message: "CAN not available".to_string() };
+                let _ = ws_tx.send(Message::text(err.to_text())).await;
+            }
+        }
     }
 }

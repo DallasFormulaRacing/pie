@@ -7,6 +7,7 @@ pub enum GuiRequest {
     PingDevice { device_id: u16 },
     RebootDevice { device_id: u16 },
     GetDeviceList,
+    SetParameters {voltage: u16, current: u16},
 }
 
 // Messages from Backend -> Frontend

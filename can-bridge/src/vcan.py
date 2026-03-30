@@ -21,7 +21,6 @@ bus = can.interface.Bus(channel='vcan0', interface='socketcan', fd=True)
 def build_arbitration_id(command, source=0x02, target=0x1E, priority=1):
     return ((priority & 0x07) << 26) | ((target & 0x1F) << 21) | ((command & 0xFFFF) << 5) | (source & 0x1F)
 
-
 def send(data_in, command, source=0x02, target=0x1E, priority=1):
     arbitration_id = build_arbitration_id(command, source, target, priority)
     msg = can.Message(
@@ -32,7 +31,7 @@ def send(data_in, command, source=0x02, target=0x1E, priority=1):
     )
     bus.send(msg)
     print(f"Sent: {data_in} cmd={hex(command)} src={hex(source)} id={hex(arbitration_id)}")
-    time.sleep(0.05)
+    time.sleep(0.08)
 
 def generate_fake_cell_frame():
     data_array = []

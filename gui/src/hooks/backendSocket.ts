@@ -8,22 +8,6 @@ import type {
 
 const RECONNECT_INTERVAL_MS = 2000;
 
-interface DfrCanId {
-  priority: number;
-  target: number;
-  command: number;
-  source: number;
-}
-
-function parseCanId(rawId: number): DfrCanId {
-  return {
-    priority: (rawId >> 26) & 0x07,
-    target: (rawId >> 21) & 0x1F,
-    command: (rawId >> 5) & 0xFFFF,
-    source: rawId & 0x1F,
-  };
-}
-
 export function useDaqSocket(url: string) {
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
   const [data, setData] = useState<{ source: string; cmd: string; sensors: SensorReading[] } | undefined>();

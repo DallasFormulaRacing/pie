@@ -21,10 +21,10 @@ export function BmsMonitor() {
     "Fourth 24 Cells",
     "Fifth 24 Cells",
     "Sixth 24 Cells",
-    "First 60 Temps",
-    "Last 60 Temps",
-    "Pack Metadata",
-    "IMD Data"
+    "First 60 Temps", // not currently received
+    "Last 60 Temps",  // not currently received
+    "Pack Metadata",  // not currently received
+    "IMD Data"        // not currently received
   ];
 
   useEffect(() => {

@@ -26,4 +26,5 @@ export interface SensorReading {
 export type FrontendCommand =
   | { cmd: "pingDevice"; deviceId: number }
   | { cmd: "rebootDevice"; deviceId: number }
-  | { cmd: "getDeviceList" };
+  | { cmd: "getDeviceList" }
+  | { cmd: "sendData"; voltage: number; current: number }

@@ -44,6 +44,12 @@ impl CanWriter {
     pub fn send_reboot(&self, device_id: u16) -> anyhow::Result<()> {
         self.send_frame(1, device_id, canprotocol::BL_CMD_REBOOT, NODE_ID_RASPI, &[])
     }
+
+    pub fn send_parameters(&self, voltage: u16, current: u16) -> anyhow::Result<()> {
+        self.send_frame(1, NODE_ID_ALL_NODES, BL_CMD_WRITE, NODE_ID_RASPI, ) // not working
+        // dk how the frames are structured
+        // it's documented somewhere but im really tired
+    }
 }
 
 
