@@ -1,6 +1,5 @@
 // src/pages/DaqHome.tsx
 import { CommonLayout } from "@/components/CommonLayout";
-import { LiveTestGraph } from "@/components/Graph";
 import { InfoBox } from "@/components/InfoBox";
 import { TextBoxes } from "@/components/TextBoxes";
 import { useEffect, useState } from "react";
@@ -63,6 +62,7 @@ export function Homepage() {
       }, [data]);
 
   return (
+    // need confirmation for each of these
     <CommonLayout>
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <InfoBox 
@@ -98,9 +98,9 @@ export function Homepage() {
           inputData={0}
         />
       </div>
-      <div>
+      <div className="flex justify-center">
         <TextBoxes 
-          callback={sendCommand}
+          sendCommand={sendCommand}
         />
       </div>
     </CommonLayout>

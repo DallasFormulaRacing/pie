@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Activity } from "lucide-react"
 
-// Define the "contract" for what this component needs
 interface GraphProps {
   title: string;
-  description?: string; // The '?' means this is optional
+  description?: string; 
   sensorData?: { name: string; value: number; unit: string }[];
 }
 
@@ -21,10 +20,10 @@ export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", senso
     if (sensorData && sensorData.length > 0) {
       const now = Date.now() / 1000;
       setData(prev => {
-        const newData: [number[], ...number[][]] = [ [...prev[0], now].slice(-100) ];
+        const newData: [number[], ...number[][]] = [ [...prev[0], now].slice(-15) ];
         sensorData.forEach((sensor, index) => {
           if (!newData[index + 1]) newData[index + 1] = [];
-          newData[index + 1] = [...(prev[index + 1] || []), sensor.value].slice(-100);
+          newData[index + 1] = [...(prev[index + 1] || []), sensor.value].slice(-15);
         });
         return newData;
       });
@@ -43,7 +42,6 @@ export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", senso
     <Card className="w-full bg-zinc-950 border-zinc-800">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <div className="space-y-1">
-          {/* Use the 'title' prop here */}
           <CardTitle className="text-xl font-bold tracking-tight uppercase">
             {title}
           </CardTitle>

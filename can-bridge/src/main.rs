@@ -194,11 +194,11 @@ where
             if let Some(writer) = can_writer {
                 let writer = writer.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    writer.send_parameters(device_id)
+                    writer.send_parameters(voltage, current)
                 }).await;
                 match result {
-                    Ok(Ok(())) => info!("Reboot sent to device 0x{:02X}", device_id),
-                    Ok(Err(e)) => warn!("Failed to send reboot to 0x{:02X}: {}", device_id, e),
+                    Ok(Ok(())) => info!("Parameters received from frontend, V: {}, I: {}", voltage, current),
+                    Ok(Err(e)) => warn!("Failed to set parameters: {}", e),
                     Err(e) => warn!("Spawn error: {}", e),
                 }
             } else {

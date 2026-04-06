@@ -31,7 +31,7 @@ def send(data_in, command, source=0x02, target=0x1E, priority=1):
     )
     bus.send(msg)
     print(f"Sent: {data_in} cmd={hex(command)} src={hex(source)} id={hex(arbitration_id)}")
-    time.sleep(0.08)
+    time.sleep(0.12)
 
 def generate_fake_cell_frame():
     data_array = []

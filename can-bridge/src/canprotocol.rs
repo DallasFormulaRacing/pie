@@ -102,6 +102,7 @@ pub const CMD_ID_SENDING_DATA: u16 = 0x051;
 pub const CMD_ID_RESET_NODE: u16 = 0x099;
 pub const CMD_ID_SET_LED: u16 = 0x100;
 pub const CMD_ID_SET_FREQ: u16 = 0x101;
+pub const CMD_ID_SET_PARAMETERS: u16 = 0x102;   // not sure where this should go / under what?
 
 // BL Commands
 pub const BL_CMD_PING: u16 = 0x040;
@@ -139,6 +140,7 @@ pub fn cmd_name(id: u16) -> &'static str {
         CMD_ID_LAST_60_TEMPS => "Last 60 Temps",
         CMD_ID_PACK_METADATA => "Pack Metadata",
         CMD_ID_IMD_DATA => "IMD Data",
+        CMD_ID_SET_PARAMETERS => "Set Parameters",
         _ => "Unknown",
     }
 }

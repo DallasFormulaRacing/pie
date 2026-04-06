@@ -46,9 +46,14 @@ impl CanWriter {
     }
 
     pub fn send_parameters(&self, voltage: u16, current: u16) -> anyhow::Result<()> {
-        self.send_frame(1, NODE_ID_ALL_NODES, BL_CMD_WRITE, NODE_ID_RASPI, ) // not working
-        // dk how the frames are structured
-        // it's documented somewhere but im really tired
+        // not sure how to send the data to MCU?
+        let data = [
+            (voltage >> 8) as u8,
+            voltage as u8,
+            (current >> 8) as u8,
+            current as u8,
+        ];
+        self.send_frame(1, NODE_ID_ALL_NODES, canprotocol::CMD_ID_SET_PARAMETERS, NODE_ID_RASPI, &data)
     }
 }
 

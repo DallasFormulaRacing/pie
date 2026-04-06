@@ -40,6 +40,7 @@ export function DaqMonitor() {
       if (!data) return;
 
       setCellData((prev) => {
+        console.log("Current cells1 length:", prev.cells1.length);
         switch (data.cmd) {
           case "First 24 Cells":
             console.log("cells1: ", data.sensors.length);
