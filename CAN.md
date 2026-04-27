@@ -55,20 +55,32 @@
 | `CMD_REQ_UUID`             | `0xDF02` | `1101111100000010` | Request node UUID                  | `0`   | No data                             |
 | `CMD_REQ_FW_VER`           | `0xDF03` | `1101111100000011` | Request node firmware version      | `0`   | No data                             |
 
-### BMS Application Commands
+### BMS GUI Application Commands
 
-| Name                       | Hex      | Command Binary | Description                                                   | DLC  | Data Description |
-| -------------------------- | -------- | -------------- | ------------------------------------------------------------- | ---- | ---------------- |
-| `BMS_CELL_VOLTAGES_PACK_1` | `0xB101` | ``             | All cell voltages of segment # 1 (closest to BMS Controller)  | `48` |                  |
-| `BMS_CELL_VOLTAGES_PACK_2` | `0xB102` | ``             | All cell voltages of segment # 2                              | `48` |                  |
-| `BMS_CELL_VOLTAGES_PACK_3` | `0xB103` | ``             | All cell voltages of segment # 3                              | `48` |                  |
-| `BMS_CELL_VOLTAGES_PACK_4` | `0xB104` | ``             | All cell voltages of segment # 4                              | `48` |                  |
-| `BMS_CELL_VOLTAGES_PACK_5` | `0xB105` | ``             | All cell voltages of segment # 5                              | `48` |                  |
-| `BMS_CELL_VOLTAGES_PACK_6` | `0xB106` | ``             | All cell voltages of segment # 6 (furthest to BMS Controller) | `48` |                  |
-| `BMS_SEGMENT_TEMPS_HALF_1` | `0xB111` | ``             | Thermistor readings of first 3 segments (closest)             | `64` |                  |
-| `BMS_SEGMENT_TEMPS_HALF_2` | `0xB112` | ``             | Thermistor readings of last 3 segments (farthest)             | `64` |                  |
-| `BMS_BATTERY_PACK_DATA`    | `0xBFFF` | ``             | pack volt, soc est, current, cell balancing stats             | `24` |                  |
-| `BMS_IMD_DATA`             | `0xBA01` | ``             |                                                               | ``   |                  |
+| Name                       | Hex      | Command Binary | Description                                                   | DLC   | Data Description |
+| -------------------------- | -------- | -------------- | ------------------------------------------------------------- | ----- | ---------------- |
+| `BMS_CELL_VOLTAGES_PACK_1` | `0xB101` | ``             | All cell voltages of segment # 1 (closest to BMS Controller)  | `48`  |                  |
+| `BMS_CELL_VOLTAGES_PACK_2` | `0xB102` | ``             | All cell voltages of segment # 2                              | `48`  |                  |
+| `BMS_CELL_VOLTAGES_PACK_3` | `0xB103` | ``             | All cell voltages of segment # 3                              | `48`  |                  |
+| `BMS_CELL_VOLTAGES_PACK_4` | `0xB104` | ``             | All cell voltages of segment # 4                              | `48`  |                  |
+| `BMS_CELL_VOLTAGES_PACK_5` | `0xB105` | ``             | All cell voltages of segment # 5                              | `48`  |                  |
+| `BMS_CELL_VOLTAGES_PACK_6` | `0xB106` | ``             | All cell voltages of segment # 6 (furthest to BMS Controller) | `48`  |                  |
+| `BMS_SEGMENT_TEMPS_HALF_1` | `0xB111` | ``             | Thermistor readings of first 3 segments (closest)             | `64`  |                  |
+| `BMS_SEGMENT_TEMPS_HALF_2` | `0xB112` | ``             | Thermistor readings of last 3 segments (farthest)             | `64`  |                  |
+| `BMS_BATTERY_PACK_DATA`    | `0xB000` | ``             | pack volt, soc est, current, cell balancing stats             | `24`  |                  |
+| `BMS_IMD_DATA`             | `0xBA01` | `???`          | IMD Stuff                                                     | `???` | ???              |
+
+### BMS Normal Commands
+
+| Name                 | Hex      | Command Binary | Description            | DLC  | Data Description                          |
+| -------------------- | -------- | -------------- | ---------------------- | ---- | ----------------------------------------- |
+| `BMS_CURRENT_SENSOR` | `0xBEEF` | ``             | Current Sensor reading | `48` | (Motorola) Current exiting the pack in mA |
+| `BMS_IMD_REQUEST`    | `0xBF22` | ``             | IMD Request            |      | (Intel)                                   |
+| `BMS_IMD_RESPONSE`   | `0xBF23` | ``             | IMD Response           |      | (Intel)                                   |
+| `BMS_IMD_GENERAL`    | `0xBF37` | ``             | IMD General            |      | (Intel)                                   |
+| `BMS_IMD_ISO_DETAIL` | `0xBF38` | ``             | IMD Isolation detail   |      | (Intel)                                   |
+| `BMS_IMD_VOLTAGE`    | `0xBF39` | ``             | IMD Voltage            |      | (Intel)                                   |
+| `BMS_IMD_IT_SYSTEM`  | `0xBF3A` | ``             | IMD IT system          |      | (Intel)                                   |
 
 ### Bootloader Commands
 
