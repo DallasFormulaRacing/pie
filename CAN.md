@@ -75,12 +75,12 @@
 | Name                 | Hex      | Command Binary | Description            | DLC  | Data Description                          |
 | -------------------- | -------- | -------------- | ---------------------- | ---- | ----------------------------------------- |
 | `BMS_CURRENT_SENSOR` | `0xBEEF` | ``             | Current Sensor reading | `48` | (Motorola) Current exiting the pack in mA |
-| `BMS_IMD_REQUEST`    | `0xBF22` | ``             | IMD Request            |      | (Intel)                                   |
-| `BMS_IMD_RESPONSE`   | `0xBF23` | ``             | IMD Response           |      | (Intel)                                   |
-| `BMS_IMD_GENERAL`    | `0xBF37` | ``             | IMD General            |      | (Intel)                                   |
-| `BMS_IMD_ISO_DETAIL` | `0xBF38` | ``             | IMD Isolation detail   |      | (Intel)                                   |
-| `BMS_IMD_VOLTAGE`    | `0xBF39` | ``             | IMD Voltage            |      | (Intel)                                   |
-| `BMS_IMD_IT_SYSTEM`  | `0xBF3A` | ``             | IMD IT system          |      | (Intel)                                   |
+| `BMS_IMD_REQUEST`    | `0xBF22` | ``             | IMD Request            | `8`  | (Intel)                                   |
+| `BMS_IMD_RESPONSE`   | `0xBF23` | ``             | IMD Response           | `8`  | (Intel)                                   |
+| `BMS_IMD_GENERAL`    | `0xBF37` | ``             | IMD General            | `8`  | (Intel)                                   |
+| `BMS_IMD_ISO_DETAIL` | `0xBF38` | ``             | IMD Isolation detail   | `8`  | (Intel)                                   |
+| `BMS_IMD_VOLTAGE`    | `0xBF39` | ``             | IMD Voltage            | `8`  | (Intel)                                   |
+| `BMS_IMD_IT_SYSTEM`  | `0xBF3A` | ``             | IMD IT system          | `8`  | (Intel)                                   |
 
 ### Bootloader Commands
 
