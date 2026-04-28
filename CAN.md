@@ -23,6 +23,7 @@
 | `NODE_RR`       | `0x05` | `00101` | Rear-right wheel node          |
 | `NODE_NUCLEO_1` | `0x06` | `00110` | Nucleo board 1                 |
 | `NODE_NUCLEO_2` | `0x07` | `00111` | Nucleo board 2                 |
+| `NODE_VCU`      | `0x1B` | `?` | Vehicle Control Unit |
 | `NODE_BMS`      | `0x1C` | `11111` | Battery Management System      |
 | `NODE_DASH`     | `0x1D` | `11101` | Dashboard                      |
 | `NODE_RASPI`    | `0x1E` | `11110` | Raspberry Pi (main controller) |
