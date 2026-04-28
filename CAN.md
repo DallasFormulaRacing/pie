@@ -57,18 +57,22 @@
 
 ### BMS GUI Application Commands
 
-| Name                       | Hex      | Command Binary | Description                                                   | DLC   | Data Description |
-| -------------------------- | -------- | -------------- | ------------------------------------------------------------- | ----- | ---------------- |
-| `BMS_CELL_VOLTAGES_PACK_1` | `0xB101` | ``             | All cell voltages of segment # 1 (closest to BMS Controller)  | `48`  |                  |
-| `BMS_CELL_VOLTAGES_PACK_2` | `0xB102` | ``             | All cell voltages of segment # 2                              | `48`  |                  |
-| `BMS_CELL_VOLTAGES_PACK_3` | `0xB103` | ``             | All cell voltages of segment # 3                              | `48`  |                  |
-| `BMS_CELL_VOLTAGES_PACK_4` | `0xB104` | ``             | All cell voltages of segment # 4                              | `48`  |                  |
-| `BMS_CELL_VOLTAGES_PACK_5` | `0xB105` | ``             | All cell voltages of segment # 5                              | `48`  |                  |
-| `BMS_CELL_VOLTAGES_PACK_6` | `0xB106` | ``             | All cell voltages of segment # 6 (furthest to BMS Controller) | `48`  |                  |
-| `BMS_SEGMENT_TEMPS_HALF_1` | `0xB111` | ``             | Thermistor readings of first 3 segments (closest)             | `64`  |                  |
-| `BMS_SEGMENT_TEMPS_HALF_2` | `0xB112` | ``             | Thermistor readings of last 3 segments (farthest)             | `64`  |                  |
-| `BMS_BATTERY_PACK_DATA`    | `0xB000` | ``             | pack volt, soc est, current, cell balancing stats             | `24`  |                  |
-| `BMS_IMD_DATA`             | `0xBA01` | `???`          | IMD Stuff                                                     | `???` | ???              |
+| Name                        | Hex      | Command Binary | Description                                                   | DLC   | Data Description                             |
+| --------------------------- | -------- | -------------- | ------------------------------------------------------------- | ----- | -------------------------------------------- |
+| `BMS_CELL_VOLTAGES_PACK_1`  | `0xB101` | ``             | All cell voltages of segment # 1 (closest to BMS Controller)  | `48`  |                                              |
+| `BMS_CELL_VOLTAGES_PACK_2`  | `0xB102` | ``             | All cell voltages of segment # 2                              | `48`  |                                              |
+| `BMS_CELL_VOLTAGES_PACK_3`  | `0xB103` | ``             | All cell voltages of segment # 3                              | `48`  |                                              |
+| `BMS_CELL_VOLTAGES_PACK_4`  | `0xB104` | ``             | All cell voltages of segment # 4                              | `48`  |                                              |
+| `BMS_CELL_VOLTAGES_PACK_5`  | `0xB105` | ``             | All cell voltages of segment # 5                              | `48`  |                                              |
+| `BMS_CELL_VOLTAGES_PACK_6`  | `0xB106` | ``             | All cell voltages of segment # 6 (furthest to BMS Controller) | `48`  |                                              |
+| `BMS_SEGMENT_TEMPS_HALF_1`  | `0xB111` | ``             | Thermistor readings of first 3 segments (closest)             | `64`  |                                              |
+| `BMS_SEGMENT_TEMPS_HALF_2`  | `0xB112` | ``             | Thermistor readings of last 3 segments (farthest)             | `64`  |                                              |
+| `BMS_BATTERY_PACK_DATA`     | `0xB000` | ``             | pack volt, soc est, current, cell balancing stats             | `24`  |                                              |
+| `BMS_IMD_DATA`              | `0xBA01` | `???`          | IMD Stuff                                                     | `???` | ???                                          |
+| `BMS_GUI_CONNECT`           | `0xBB01` | `???`          | Connect to laptop and trigger charger FSM                     | `0`   | ???                                          |
+| `BMS_GUI_CHARGING_REQUEST`  | `0xBB02` | `???`          | Send power details to ELCON                                   | `4`   | `u16` for Max Voltage, `u16` for Max Current |
+| `BMS_GUI_DISCONNECT`        | `0xBB03` | `???`          | Disconnect from laptop and terminate charger FSM              | `0`   | ???                                          |
+| `BMS_GUI_CHARGING_SOFTSTOP` | `0xBBFF` | `???`          | Gracefully cut power to the battery pack                      | `0`   | ???                                          |
 
 ### BMS Normal Commands
 
