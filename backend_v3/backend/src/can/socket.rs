@@ -1,34 +1,18 @@
 use std::io;
 use std::time::Duration;
 
-#[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex};
 
-#[cfg(target_os = "linux")]
 use embedded_can::{ExtendedId, Frame as _, Id};
-#[cfg(target_os = "linux")]
 use socketcan::frame::FdFlags;
-#[cfg(target_os = "linux")]
 use socketcan::{CanAnyFrame, CanFdFrame, CanFdSocket, Socket};
 
-use super::{CanEnvelope, CanNode, CanTxCommand, DfrCanId};
+use super::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CanSocketError {
     #[error("CAN socket IO error: {0}")]
     Io(#[from] io::Error),
-
-    #[error("CAN sockets are only supported on Linux")]
-    UnsupportedPlatform,
-
-    #[error("CAN frame does not use a 29-bit extended ID")]
-    NotExtendedId,
-
-    #[error("CAN frame is not a CAN FD frame")]
-    NotFdFrame,
-
-    #[error("invalid DFR CAN ID: {0}")]
-    InvalidId(&'static str),
 
     #[error("failed to construct socketcan extended ID from raw ID 0x{0:08X}")]
     InvalidExtendedId(u32),
@@ -37,29 +21,11 @@ pub enum CanSocketError {
     InvalidFdFrame,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReceivedCanFrame {
-    pub id: DfrCanId,
-    pub data: Vec<u8>,
-}
-
-impl ReceivedCanFrame {
-    pub fn envelope(&self) -> CanEnvelope<'_> {
-        CanEnvelope::from((self.id, self.data.as_slice()))
-    }
-}
-
-#[cfg(target_os = "linux")]
 #[derive(Clone)]
 pub struct CanSocket {
     socket: Arc<Mutex<CanFdSocket>>,
 }
 
-#[cfg(not(target_os = "linux"))]
-#[derive(Clone)]
-pub struct CanSocket;
-
-#[cfg(target_os = "linux")]
 impl CanSocket {
     pub fn open(interface: &str) -> Result<Self, CanSocketError> {
         let socket = CanFdSocket::open(interface)?;
@@ -67,41 +33,29 @@ impl CanSocket {
             socket: Arc::new(Mutex::new(socket)),
         })
     }
-
     pub fn set_read_timeout(&self, timeout: Duration) -> Result<(), CanSocketError> {
         let socket = self.socket.lock().expect("CAN socket mutex poisoned");
         socket.set_read_timeout(timeout)?;
         Ok(())
     }
 
-    pub fn read_frame(&self) -> Result<ReceivedCanFrame, CanSocketError> {
+    pub fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
         let socket = self.socket.lock().expect("CAN socket mutex poisoned");
         let frame = socket.read_frame()?;
-        received_frame_from_socketcan(frame)
+        Ok(DfrCanMessageBuf::try_from(frame).ok())
     }
 
-    pub fn try_read_frame(&self) -> Result<Option<ReceivedCanFrame>, CanSocketError> {
-        match self.read_frame() {
+    pub fn try_read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
+        match self.read_message() {
             Ok(frame) => Ok(Some(frame)),
             Err(CanSocketError::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
             Err(error) => Err(error),
         }
+        .map(|message| message.flatten())
     }
 
-    pub fn write_command(
-        &self,
-        source: CanNode,
-        command: &CanTxCommand,
-    ) -> Result<(), CanSocketError> {
-        let id = DfrCanId::new(
-            command.priority,
-            u8::from(command.target),
-            u16::from(command.command),
-            u8::from(source),
-        )
-        .map_err(CanSocketError::InvalidId)?;
-
-        self.write_raw(id, command.payload.as_slice())
+    pub fn write_message(&self, message: &DfrCanMessageBuf) -> Result<(), CanSocketError> {
+        self.write_raw(message.id, message.data.as_slice())
     }
 
     pub fn write_raw(&self, id: DfrCanId, data: &[u8]) -> Result<(), CanSocketError> {
@@ -117,58 +71,204 @@ impl CanSocket {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
-impl CanSocket {
-    pub fn open(_interface: &str) -> Result<Self, CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
-    }
+impl<'a> TryFrom<&'a CanFdFrame> for DfrCanMessage<'a> {
+    type Error = CanMessageError;
 
-    pub fn set_read_timeout(&self, _timeout: Duration) -> Result<(), CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
-    }
+    fn try_from(frame: &'a CanFdFrame) -> Result<Self, Self::Error> {
+        let id = match frame.id() {
+            Id::Extended(id) => DfrCanId::try_from(id.as_raw())?,
+            _ => return Err(CanMessageError::NotExtendedId),
+        };
 
-    pub fn read_frame(&self) -> Result<ReceivedCanFrame, CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
-    }
-
-    pub fn try_read_frame(&self) -> Result<Option<ReceivedCanFrame>, CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
-    }
-
-    pub fn write_command(
-        &self,
-        _source: CanNode,
-        _command: &CanTxCommand,
-    ) -> Result<(), CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
-    }
-
-    pub fn write_raw(&self, _id: DfrCanId, _data: &[u8]) -> Result<(), CanSocketError> {
-        Err(CanSocketError::UnsupportedPlatform)
+        Ok(DfrCanMessage {
+            id,
+            data: frame.data(),
+        })
     }
 }
 
-#[cfg(target_os = "linux")]
-pub fn received_frame_from_socketcan(
-    frame: CanAnyFrame,
-) -> Result<ReceivedCanFrame, CanSocketError> {
-    match frame {
-        CanAnyFrame::Fd(frame) => received_fd_frame_from_socketcan(&frame),
-        _ => Err(CanSocketError::NotFdFrame),
+impl TryFrom<CanAnyFrame> for DfrCanMessageBuf {
+    type Error = CanMessageError;
+
+    fn try_from(frame: CanAnyFrame) -> Result<Self, Self::Error> {
+        let CanAnyFrame::Fd(frame) = frame else {
+            return Err(CanMessageError::NonFdFrame);
+        };
+
+        Ok(DfrCanMessage::try_from(&frame)?.to_buf())
     }
 }
 
-#[cfg(target_os = "linux")]
-pub fn received_fd_frame_from_socketcan(
-    frame: &CanFdFrame,
-) -> Result<ReceivedCanFrame, CanSocketError> {
-    let id = match frame.id() {
-        Id::Extended(id) => DfrCanId::try_from(id.as_raw()).map_err(CanSocketError::InvalidId)?,
-        _ => return Err(CanSocketError::NotExtendedId),
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use embedded_can::{ExtendedId, StandardId};
+    use socketcan::CanDataFrame;
 
-    Ok(ReceivedCanFrame {
-        id,
-        data: frame.data().to_vec(),
-    })
+    fn raw_id(priority: u8, target: CanNode, command: CanCommand, source: CanNode) -> u32 {
+        DfrCanId {
+            priority,
+            target,
+            source,
+            command,
+        }
+        .to_raw_id()
+    }
+
+    fn fd_frame(
+        priority: u8,
+        target: CanNode,
+        command: CanCommand,
+        source: CanNode,
+        data: &[u8],
+    ) -> CanFdFrame {
+        let raw_id = raw_id(priority, target, command, source);
+        let id = ExtendedId::new(raw_id).expect("raw DFR ID should be a valid extended ID");
+        CanFdFrame::new(id, data).expect("payload should fit in a CAN FD frame")
+    }
+
+    #[test]
+    fn parses_fd_frame_into_dfr_message() {
+        let frame = fd_frame(
+            1,
+            CanNode::Raspi,
+            CanCommand::Common(CommonCanCommand::Pong),
+            CanNode::Bms,
+            &[0xAA, 0xBB],
+        );
+
+        let message = DfrCanMessage::try_from(&frame).expect("frame should parse");
+
+        assert_eq!(message.id.priority, 1);
+        assert_eq!(message.id.target, CanNode::Raspi);
+        assert_eq!(message.id.source, CanNode::Bms);
+        assert_eq!(
+            message.id.command,
+            CanCommand::Common(CommonCanCommand::Pong)
+        );
+        assert_eq!(message.data, &[0xAA, 0xBB]);
+    }
+
+    #[test]
+    fn parses_any_fd_frame_into_owned_dfr_message() {
+        let frame = fd_frame(
+            2,
+            CanNode::FrontLeft,
+            CanCommand::Daq(DaqCanCommand::SpeedData),
+            CanNode::Raspi,
+            &[1, 2, 3, 4],
+        );
+
+        let message = DfrCanMessageBuf::try_from(CanAnyFrame::Fd(frame))
+            .expect("FD frame should parse into owned DFR message");
+
+        assert_eq!(message.id.priority, 2);
+        assert_eq!(message.id.target, CanNode::FrontLeft);
+        assert_eq!(message.id.source, CanNode::Raspi);
+        assert_eq!(
+            message.id.command,
+            CanCommand::Daq(DaqCanCommand::SpeedData)
+        );
+        assert_eq!(message.data, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn rejects_non_fd_frame() {
+        let raw_id = raw_id(
+            1,
+            CanNode::Raspi,
+            CanCommand::Common(CommonCanCommand::Ping),
+            CanNode::Bms,
+        );
+        let id = ExtendedId::new(raw_id).expect("raw DFR ID should be a valid extended ID");
+        let classic_frame = CanDataFrame::new(id, &[1, 2, 3]).expect("classic frame");
+
+        let error = DfrCanMessageBuf::try_from(CanAnyFrame::Normal(classic_frame))
+            .expect_err("classic CAN frames should be discarded");
+
+        assert_eq!(error, CanMessageError::NonFdFrame);
+    }
+
+    #[test]
+    fn rejects_standard_id_fd_frame() {
+        let id = StandardId::new(0x123).expect("valid standard ID");
+        let frame = CanFdFrame::new(id, &[1, 2, 3]).expect("FD frame");
+
+        let error = DfrCanMessage::try_from(&frame).expect_err("standard IDs are not DFR IDs");
+
+        assert_eq!(error, CanMessageError::NotExtendedId);
+    }
+
+    #[test]
+    fn rejects_unknown_node_id() {
+        let raw_id = ((1_u32) << 26)
+            | ((0x12_u32) << 21)
+            | ((u16::from(CanCommand::Common(CommonCanCommand::Ping)) as u32) << 5)
+            | u8::from(CanNode::Bms) as u32;
+        let id = ExtendedId::new(raw_id).expect("raw ID should still be a valid extended ID");
+        let frame = CanFdFrame::new(id, &[]).expect("FD frame");
+
+        let error = DfrCanMessage::try_from(&frame).expect_err("unknown node should be rejected");
+
+        assert_eq!(error, CanMessageError::UnknownNode(0x12));
+    }
+
+    #[test]
+    fn rejects_unknown_command_id() {
+        let raw_id = ((1_u32) << 26)
+            | ((u8::from(CanNode::Raspi) as u32) << 21)
+            | ((0x1234_u32) << 5)
+            | u8::from(CanNode::Bms) as u32;
+        let id = ExtendedId::new(raw_id).expect("raw ID should still be a valid extended ID");
+        let frame = CanFdFrame::new(id, &[]).expect("FD frame");
+
+        let error =
+            DfrCanMessage::try_from(&frame).expect_err("unknown command should be rejected");
+
+        assert_eq!(error, CanMessageError::UnknownCommand(0x1234));
+    }
+
+    #[test]
+    #[ignore = "fill in once BMS voltage payload layout is known"]
+    fn parses_bms_voltage_payload_skeleton() {
+        let frame = fd_frame(
+            1,
+            CanNode::Raspi,
+            CanCommand::Bms(BmsCanCommand::BatteryPackData),
+            CanNode::Bms,
+            &[
+                // TODO: replace with real firmware bytes for BMS pack/min/max/average voltage.
+            ],
+        );
+
+        let message = DfrCanMessage::try_from(&frame).expect("frame ID should parse");
+
+        assert_eq!(
+            message.id.command,
+            CanCommand::Bms(BmsCanCommand::BatteryPackData)
+        );
+        // TODO: pass `message` into the future BMS payload parser and assert decoded values.
+    }
+
+    #[test]
+    #[ignore = "fill in once DAQ speed payload layout is known"]
+    fn parses_daq_speed_payload_skeleton() {
+        let frame = fd_frame(
+            1,
+            CanNode::Raspi,
+            CanCommand::Daq(DaqCanCommand::SpeedData),
+            CanNode::FrontLeft,
+            &[
+                // TODO: make sample data
+            ],
+        );
+
+        let message = DfrCanMessage::try_from(&frame).expect("frame ID should parse");
+
+        assert_eq!(
+            message.id.command,
+            CanCommand::Daq(DaqCanCommand::SpeedData)
+        );
+        // TODO: pass `message` into the future DAQ payload parser and assert decoded values.
+    }
 }
