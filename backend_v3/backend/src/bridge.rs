@@ -135,8 +135,8 @@ fn can_node_to_device(node: CanNode) -> Option<Device> {
         CanNode::FrontRight => Some(Device::NodeFR),
         CanNode::RearLeft => Some(Device::NodeRL),
         CanNode::RearRight => Some(Device::NodeRR),
-        CanNode::Nucleo1 => Some(Device::NodeRideHeight),
-        CanNode::Nucleo2 => Some(Device::NodePDMTB),
+        CanNode::Nucleo1 => Some(Device::Nucleo1),
+        CanNode::Nucleo2 => Some(Device::Nucleo2),
         CanNode::Vcu => Some(Device::Vcu),
         CanNode::Bms => Some(Device::Bms),
         CanNode::Dash => Some(Device::NodeDash),
@@ -205,7 +205,7 @@ mod tests {
             panic!("expected DAQ IMU telemetry event");
         };
 
-        assert_eq!(source, Device::NodeRideHeight);
+        assert_eq!(source, Device::Nucleo1);
         assert_eq!(samples[0].angular_acceleration.rho, 7.0);
         assert_eq!(samples[0].angular_acceleration.theta, -14.0);
         assert_eq!(samples[0].angular_acceleration.phi, 21.0);
@@ -272,7 +272,7 @@ mod tests {
             panic!("expected DAQ temperature telemetry event");
         };
 
-        assert_eq!(source, Device::NodeRideHeight);
+        assert_eq!(source, Device::Nucleo1);
         assert_eq!(samples[0].tire, Celsius(25.3));
         assert_eq!(samples[1].tire, Celsius(-12.7));
         assert_eq!(samples[0].brake, Celsius(40.5));

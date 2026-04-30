@@ -34,8 +34,8 @@ pub enum Device {
     NodeRL,
     NodeRR,
     NodeDash,
-    NodeRideHeight,
-    NodePDMTB,
+    Nucleo1,
+    Nucleo2,
     NodePDMDASH,
     NodePDMPCBPanel,
 }

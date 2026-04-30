@@ -9,8 +9,8 @@ export type Device =
   | "nodeRL"
   | "nodeRR"
   | "nodeDash"
-  | "nodeRideHeight"
-  | "nodePDMTB"
+  | "nucleo1"
+  | "nucleo2"
   | "nodePDMDASH"
   | "nodePDMPCBPanel";
 
