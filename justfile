@@ -2,7 +2,7 @@ registry := "ghcr.io/schommie"
 
 # Cross-build both images for arm64
 build:
-    just --parallel build-backend build-gui
+    @bash -u -o pipefail -c 'status=0; just build-backend & backend=$!; just build-gui & gui=$!; wait $backend || status=$?; wait $gui || status=$?; exit $status'
 
 build-backend:
     podman build --platform linux/arm64 -t {{registry}}/ev-can-bridge:latest ./backend_v3/backend
@@ -12,7 +12,7 @@ build-gui:
 
 # Push images to GHCR
 push:
-    just --parallel push-backend push-gui
+    @bash -u -o pipefail -c 'status=0; just push-backend & backend=$!; just push-gui & gui=$!; wait $backend || status=$?; wait $gui || status=$?; exit $status'
 
 push-backend:
     podman push {{registry}}/ev-can-bridge:latest
@@ -22,8 +22,8 @@ push-gui:
 
 # Build and push (run on dev machine)
 deploy:
-    just --parallel build-backend build-gui
-    just --parallel push-backend push-gui
+    @bash -u -o pipefail -c 'status=0; just build-backend & backend=$!; just build-gui & gui=$!; wait $backend || status=$?; wait $gui || status=$?; exit $status'
+    @bash -u -o pipefail -c 'status=0; just push-backend & backend=$!; just push-gui & gui=$!; wait $backend || status=$?; wait $gui || status=$?; exit $status'
     @echo "Done. Run 'sudo podman auto-update' on the Raspi."
 
 # Start dev environment
@@ -37,3 +37,6 @@ up:
 # Stop all services
 down:
     podman-compose down
+
+login:
+    sudo podman login {{registry}} --username schommie --password-stdin < ~/.ghtoken

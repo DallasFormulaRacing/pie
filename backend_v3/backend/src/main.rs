@@ -1,4 +1,5 @@
 use futures_util::{SinkExt, StreamExt};
+use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,6 +19,7 @@ use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessageBuf};
 use device::DeviceRegistry;
 use websocket::{BackendEvent, BackendEventData, backend_event, encode_outgoing};
 const SERVER_ADDR: &str = "0.0.0.0:9002";
+const DEVICE_STATUS_BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
 
 #[cfg(not(target_os = "linux"))]
 #[derive(Clone)]
@@ -150,17 +152,31 @@ async fn can_receive_task(
     registry: Arc<Mutex<DeviceRegistry>>,
     event_tx: broadcast::Sender<BackendEvent>,
 ) {
+    let mut last_status_broadcast = HashMap::<CanNode, Instant>::new();
+
     loop {
         match socket.read_message().await {
             Ok(Some(message)) => {
                 let now = Instant::now();
-                let status_event = {
+                let should_broadcast_status = last_status_broadcast
+                    .get(&message.id.source)
+                    .map(|last_broadcast| {
+                        now.duration_since(*last_broadcast) >= DEVICE_STATUS_BROADCAST_INTERVAL
+                    })
+                    .unwrap_or(true);
+
+                let status_event = if should_broadcast_status {
                     let mut registry = registry.lock().await;
                     registry.mark_seen(message.id.source, now);
                     bridge::device_status_changed(&registry, message.id.source, now)
+                } else {
+                    let mut registry = registry.lock().await;
+                    registry.mark_seen(message.id.source, now);
+                    None
                 };
 
                 if let Some(event) = status_event {
+                    last_status_broadcast.insert(message.id.source, now);
                     let _ = event_tx.send(event);
                 }
 
