@@ -88,7 +88,7 @@ async fn handle_client(
                             match bridge::ws_to_can(&request, &registry) {
                                 Ok(command) => {
                                     if let Some(socket) = can_socket.as_ref() {
-                                        match socket.write_message(&command) {
+                                        match socket.write_message(&command).await {
                                             Ok(()) => {
                                                 println!(
                                                     "frontend -> can command sent: {command:?}"

@@ -1,11 +1,10 @@
 use std::io;
-use std::time::Duration;
-
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use embedded_can::{ExtendedId, Frame as _, Id};
 use socketcan::frame::FdFlags;
-use socketcan::{CanAnyFrame, CanFdFrame, CanFdSocket, Socket};
+use socketcan::tokio::CanFdSocket;
+use socketcan::{CanAnyFrame, CanFdFrame};
 
 use super::*;
 
@@ -23,50 +22,34 @@ pub enum CanSocketError {
 
 #[derive(Clone)]
 pub struct CanSocket {
-    socket: Arc<Mutex<CanFdSocket>>,
+    socket: Arc<CanFdSocket>,
 }
 
 impl CanSocket {
     pub fn open(interface: &str) -> Result<Self, CanSocketError> {
         let socket = CanFdSocket::open(interface)?;
         Ok(Self {
-            socket: Arc::new(Mutex::new(socket)),
+            socket: Arc::new(socket),
         })
     }
-    pub fn set_read_timeout(&self, timeout: Duration) -> Result<(), CanSocketError> {
-        let socket = self.socket.lock().expect("CAN socket mutex poisoned");
-        socket.set_read_timeout(timeout)?;
-        Ok(())
-    }
 
-    pub fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
-        let socket = self.socket.lock().expect("CAN socket mutex poisoned");
-        let frame = socket.read_frame()?;
+    pub async fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
+        let frame = self.socket.read_frame().await?;
         Ok(DfrCanMessageBuf::try_from(frame).ok())
     }
 
-    pub fn try_read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
-        match self.read_message() {
-            Ok(frame) => Ok(Some(frame)),
-            Err(CanSocketError::Io(error)) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(error) => Err(error),
-        }
-        .map(|message| message.flatten())
+    pub async fn write_message(&self, message: &DfrCanMessageBuf) -> Result<(), CanSocketError> {
+        self.write_raw(message.id, message.data.as_slice()).await
     }
 
-    pub fn write_message(&self, message: &DfrCanMessageBuf) -> Result<(), CanSocketError> {
-        self.write_raw(message.id, message.data.as_slice())
-    }
-
-    pub fn write_raw(&self, id: DfrCanId, data: &[u8]) -> Result<(), CanSocketError> {
+    pub async fn write_raw(&self, id: DfrCanId, data: &[u8]) -> Result<(), CanSocketError> {
         let raw_id = id.to_raw_id();
         let extended_id =
             ExtendedId::new(raw_id).ok_or(CanSocketError::InvalidExtendedId(raw_id))?;
         let frame = CanFdFrame::with_flags(extended_id, data, FdFlags::empty())
             .ok_or(CanSocketError::InvalidFdFrame)?;
 
-        let socket = self.socket.lock().expect("CAN socket mutex poisoned");
-        socket.write_frame(&frame)?;
+        self.socket.write_frame(&frame).await?;
         Ok(())
     }
 }

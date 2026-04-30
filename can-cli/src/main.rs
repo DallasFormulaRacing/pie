@@ -2,9 +2,10 @@
 #[path = "../../backend_v3/backend/src/can/mod.rs"]
 mod can;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::io::{self, Write as _};
-    use std::time::{Duration, Instant};
+    use tokio::time::{timeout, Duration, Instant};
 
     let interface = std::env::args()
         .nth(1)
@@ -12,7 +13,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "can0".to_string());
 
     let socket = can::socket::CanSocket::open(&interface)?;
-    socket.set_read_timeout(Duration::from_millis(100))?;
 
     println!("opened {interface}");
     println!("commands: i=imu, w=wheel speed, t=temperature, q=quit");
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let message = request.to_can_message();
-        socket.write_message(&message)?;
+        socket.write_message(&message).await?;
         println!(
             "sent {:?} to {:?} as id=0x{:08X}",
             request.command,
@@ -49,16 +49,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut received_expected_response = false;
 
         while Instant::now() < deadline {
-            match socket.try_read_message() {
-                Ok(Some(message)) => {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            match timeout(remaining, socket.read_message()).await {
+                Ok(Ok(Some(message))) => {
                     print_message(&message);
                     if request.matches_response(&message) {
                         received_expected_response = true;
                         break;
                     }
                 }
-                Ok(None) => {}
-                Err(error) => eprintln!("CAN socket read error: {error}"),
+                Ok(Ok(None)) => {}
+                Ok(Err(error)) => eprintln!("CAN socket read error: {error}"),
+                Err(_) => break,
             }
         }
 
