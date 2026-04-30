@@ -1,9 +1,7 @@
-#[cfg(target_os = "linux")]
 #[allow(dead_code)]
 #[path = "../../backend_v3/backend/src/can/mod.rs"]
 mod can;
 
-#[cfg(target_os = "linux")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::io::{self, Write as _};
     use std::time::{Duration, Instant};
@@ -17,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     socket.set_read_timeout(Duration::from_millis(100))?;
 
     println!("opened {interface}");
-    println!("commands: i=imu, w=wheel speed, bt=brake temp, tt=tire temp, q=quit");
+    println!("commands: i=imu, w=wheel speed, t=temperature, q=quit");
 
     loop {
         print!("can-cli> ");
@@ -34,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let Some(request) = DaqRequest::from_input(&input) else {
-            eprintln!("unknown command: {input}. use i, w, bt, tt, or q");
+            eprintln!("unknown command: {input}. use i, w, t, or q");
             continue;
         };
 
@@ -72,12 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(not(target_os = "linux"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err("can-cli requires Linux SocketCAN support to read a CAN interface".into())
-}
 
-#[cfg(target_os = "linux")]
+
 fn print_message(message: &can::DfrCanMessageBuf) {
     let raw_id = message.id.to_raw_id();
     let command = u16::from(message.id.command);
@@ -94,14 +88,14 @@ fn print_message(message: &can::DfrCanMessageBuf) {
     );
 }
 
-#[cfg(target_os = "linux")]
+
 #[derive(Debug, Clone, Copy)]
 struct DaqRequest {
     command: can::DaqCanCommand,
     response_command: can::DaqCanCommand,
 }
 
-#[cfg(target_os = "linux")]
+
 impl DaqRequest {
     fn from_input(input: &str) -> Option<Self> {
         let (command, response_command) = match input {
@@ -110,14 +104,11 @@ impl DaqRequest {
                 can::DaqCanCommand::ReqSpeedData,
                 can::DaqCanCommand::SpeedData,
             ),
-            "bt" | "brake" | "braketemp" | "brake-temp" => (
+            "t" | "temp" | "temperature" => (
                 can::DaqCanCommand::ReqTempData,
                 can::DaqCanCommand::TempData,
             ),
-            "tt" | "tire" | "tiretemp" | "tire-temp" => (
-                can::DaqCanCommand::ReqTempData,
-                can::DaqCanCommand::TempData,
-            ),
+
             _ => return None,
         };
 
@@ -146,7 +137,7 @@ impl DaqRequest {
     }
 }
 
-#[cfg(target_os = "linux")]
+
 fn format_data(data: &[u8]) -> String {
     data.iter()
         .map(|byte| format!("{byte:02X}"))
