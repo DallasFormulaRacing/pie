@@ -1,27 +1,13 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DfrCanId {
-    pub priority: u16,
-    pub target: u16,
+    pub priority: u8,
+    pub target: u8,
     pub command: u16,
-    pub source: u16,
+    pub source: u8,
 }
 
-pub enum Priority {
-    Lowest,
-    Low,
-    Lower,
-    Medium,
-    Higher,
-    High,
-    Highest,
-}
 impl DfrCanId {
-    pub fn new(
-        priority: u16,
-        target: u16,
-        command: u16,
-        source: u16,
-    ) -> Result<Self, &'static str> {
+    pub fn new(priority: u8, target: u8, command: u16, source: u8) -> Result<Self, &'static str> {
         if priority > 0x07 {
             return Err("Priority is out of range (max 7)");
         }
@@ -63,10 +49,10 @@ impl TryFrom<u32> for DfrCanId {
             return Err("Raw CAN ID is out of range (max 29 bits)");
         }
 
-        let priority = ((value >> 26) & 0x07) as u16;
-        let target = ((value >> 21) & 0x1F) as u16;
+        let priority = ((value >> 26) & 0x07) as u8;
+        let target = ((value >> 21) & 0x1F) as u8;
         let command = ((value >> 5) & 0xFFFF) as u16;
-        let source = (value & 0x1F) as u16;
+        let source = (value & 0x1F) as u8;
 
         Ok(Self {
             priority,

@@ -1,13 +1,14 @@
 use super::*;
 
 pub struct CanTxCommand {
-    pub priority: Priority,
+    pub priority: u8,
     pub target: CanNode,
     pub command: CanCommand,
     pub payload: Vec<u8>,
 }
+
 impl CanTxCommand {
-    pub fn new(priority: Priority, target: CanNode, command: CanCommand, payload: Vec<u8>) -> Self {
+    pub fn new(priority: u8, target: CanNode, command: CanCommand, payload: Vec<u8>) -> Self {
         Self {
             priority,
             target,
