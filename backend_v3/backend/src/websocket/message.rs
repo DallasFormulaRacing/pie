@@ -3,65 +3,28 @@ use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-#[serde(
-    tag = "system",
-    content = "request",
-    rename_all = "lowercase",
-    deny_unknown_fields
-)]
-pub enum WsIncoming {
-    Daq(DaqRequest),
-    Bms(BmsRequest),
-    Vcu(VcuRequest),
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WsEnvelope<T> {
+    pub system: System,
+    pub device: Device,
+    pub data: T,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-#[serde(
-    tag = "type",
-    content = "event",
-    rename_all = "camelCase",
-    deny_unknown_fields
-)]
-pub enum WsOutgoing {
-    Daq(DaqMessage),
-    Bms(BmsMessage),
-    Vcu(VcuMessage),
-    DeviceStatusSnapshot { devices: Vec<DeviceStatus> },
-    DeviceStatusChanged { device: DeviceStatus },
-    Error { message: String },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-#[serde(tag = "command", rename_all = "camelCase", deny_unknown_fields)]
-pub enum DaqRequest {
-    Ping { target: Device },
-    Reset { target: Device },
-    RequestImu { target: Device },
-    RequestTemperature { target: Device },
-    RequestWheelSpeed { target: Device },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-#[serde(tag = "command", rename_all = "camelCase", deny_unknown_fields)]
-pub enum BmsRequest {
-    Ping { target: Device },
-    Reset { target: Device },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-#[serde(tag = "command", rename_all = "camelCase", deny_unknown_fields)]
-pub enum VcuRequest {
-    Ping { target: Device },
-    Reset { target: Device },
-}
+pub type BackendEvent = WsEnvelope<BackendEventData>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "lowercase")]
+pub enum System {
+    Backend,
+    Bms,
+    Daq,
+    Vcu,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
 pub enum Device {
     Bms,
     Vcu,
@@ -79,25 +42,26 @@ pub enum Device {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-#[serde(tag = "frame", rename_all = "camelCase", deny_unknown_fields)]
-pub enum DaqMessage {
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
+pub enum BackendEventData {
+    DeviceRegistrySnapshot { devices: Vec<DeviceStatus> },
+    DeviceStatusChanged { device: DeviceStatus },
+    DaqTelemetry { telemetry: DaqTelemetry },
+    BmsTelemetry { telemetry: BmsTelemetry },
+    BackendError { message: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
+pub enum DaqTelemetry {
     Temperature {
         source: Device,
         samples: [TemperatureSample; TEMPERATURE_SAMPLE_COUNT],
     },
-    WheelSpeed {
-        source: Device,
-        rpm: Rpm,
-    },
     Imu {
         source: Device,
         samples: [ImuSample; IMU_SAMPLE_COUNT],
-    },
-    Ping {
-        source: Device,
-    },
-    Reset {
-        source: Device,
     },
     #[serde(rename = "tbd")]
     Tbd {
@@ -106,7 +70,7 @@ pub enum DaqMessage {
     },
 }
 
-pub const TEMPERATURE_SAMPLE_COUNT: usize = 15;
+pub const TEMPERATURE_SAMPLE_COUNT: usize = 16;
 pub const IMU_SAMPLE_COUNT: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
@@ -145,8 +109,8 @@ pub struct AngularAcceleration {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
-#[serde(tag = "frame", rename_all = "camelCase", deny_unknown_fields)]
-pub enum BmsMessage {
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
+pub enum BmsTelemetry {
     Voltages {
         source: Device,
         readings: BmsVoltageReadings,
@@ -164,16 +128,6 @@ pub enum BmsMessage {
         source: Device,
         code: u32,
         severity: FaultSeverity,
-    },
-    SetValue {
-        source: Device,
-        target: MeasurementValue,
-    },
-    Reset {
-        source: Device,
-    },
-    Ping {
-        source: Device,
     },
 }
 
@@ -196,26 +150,6 @@ pub struct BmsTemperatureReadings {
     pub average: Celsius,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-#[serde(tag = "frame", rename_all = "camelCase", deny_unknown_fields)]
-pub enum VcuMessage {
-    TorqueRequest {
-        source: Device,
-        torque: NewtonMeters,
-    },
-    SetValue {
-        source: Device,
-        target: MeasurementValue,
-    },
-    Reset {
-        source: Device,
-    },
-    Ping {
-        source: Device,
-    },
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -236,17 +170,7 @@ pub struct Celsius(pub f32);
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, type = "number")]
 #[serde(transparent)]
-pub struct Rpm(pub f32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
-#[ts(export, type = "number")]
-#[serde(transparent)]
 pub struct Volts(pub f32);
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
-#[ts(export, type = "number")]
-#[serde(transparent)]
-pub struct NewtonMeters(pub f32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, type = "number")]
@@ -263,33 +187,21 @@ pub struct MeasurementValue(pub f32);
 #[serde(transparent)]
 pub struct FaultSeverity(pub f32);
 
+pub fn backend_event(data: BackendEventData) -> BackendEvent {
+    WsEnvelope {
+        system: System::Backend,
+        device: Device::Raspi,
+        data,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn deserializes_frontend_bms_ping_request() {
-        let json = r#"{
-            "system": "bms",
-            "request": {
-                "command": "ping",
-                "target": "bms"
-            }
-        }"#;
-
-        let request = serde_json::from_str::<WsIncoming>(json).expect("request should deserialize");
-
-        assert!(matches!(
-            request,
-            WsIncoming::Bms(BmsRequest::Ping {
-                target: Device::Bms
-            })
-        ));
-    }
-
-    #[test]
-    fn serializes_device_status_snapshot() {
-        let event = WsOutgoing::DeviceStatusSnapshot {
+    fn serializes_backend_device_status_snapshot() {
+        let event = backend_event(BackendEventData::DeviceRegistrySnapshot {
             devices: vec![DeviceStatus {
                 node_id: 0x1C,
                 name: "BMS".to_string(),
@@ -298,12 +210,45 @@ mod tests {
                 last_seen_ms_ago: Some(10),
                 last_error: None,
             }],
-        };
+        });
 
         let json = serde_json::to_value(&event).expect("event should serialize");
 
-        assert_eq!(json["type"], "deviceStatusSnapshot");
-        assert_eq!(json["event"]["devices"][0]["nodeId"], 0x1C);
-        assert_eq!(json["event"]["devices"][0]["online"], true);
+        assert_eq!(json["system"], "backend");
+        assert_eq!(json["device"], "raspi");
+        assert_eq!(json["data"]["type"], "deviceRegistrySnapshot");
+        assert_eq!(json["data"]["devices"][0]["nodeId"], 0x1C);
+        assert_eq!(json["data"]["devices"][0]["online"], true);
+    }
+
+    #[test]
+    fn serializes_backend_daq_imu_event() {
+        let event = backend_event(BackendEventData::DaqTelemetry {
+            telemetry: DaqTelemetry::Imu {
+                source: Device::NodeFL,
+                samples: [ImuSample {
+                    acceleration: Acceleration {
+                        x: 1.0,
+                        y: 2.0,
+                        z: 3.0,
+                    },
+                    angular_acceleration: AngularAcceleration {
+                        rho: 4.0,
+                        theta: 5.0,
+                        phi: 6.0,
+                    },
+                }; IMU_SAMPLE_COUNT],
+            },
+        });
+
+        let json = serde_json::to_value(&event).expect("event should serialize");
+
+        assert_eq!(json["data"]["type"], "daqTelemetry");
+        assert_eq!(json["data"]["telemetry"]["type"], "imu");
+        assert_eq!(json["data"]["telemetry"]["source"], "nodeFL");
+        assert_eq!(
+            json["data"]["telemetry"]["samples"][0]["acceleration"]["x"],
+            1.0
+        );
     }
 }
