@@ -60,10 +60,6 @@ impl DeviceRegistry {
         self.devices.get(&node)
     }
 
-    pub fn get_mut(&mut self, node: CanNode) -> Option<&mut TrackedDevice> {
-        self.devices.get_mut(&node)
-    }
-
     pub fn mark_seen(&mut self, node: CanNode, now: Instant) -> Option<&TrackedDevice> {
         let device = self.devices.get_mut(&node)?;
         device.online = true;
@@ -72,6 +68,7 @@ impl DeviceRegistry {
         Some(device)
     }
 
+    // Needs to be implemented as devices never show as offline after missing a heartbeat
     pub fn mark_offline(&mut self, node: CanNode, error: Option<String>) -> Option<&TrackedDevice> {
         let device = self.devices.get_mut(&node)?;
         device.online = false;

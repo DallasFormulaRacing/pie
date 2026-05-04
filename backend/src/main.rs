@@ -214,12 +214,12 @@ struct CanPollingSchedule {
 
 const CAN_POLLING_SCHEDULES: &[CanPollingSchedule] = &[
     CanPollingSchedule {
-        target: CanNode::Nucleo1,
+        target: CanNode::AllNodes,
         request_command: DaqCanCommand::ReqImuData,
         interval: Duration::from_millis(20),
     },
     CanPollingSchedule {
-        target: CanNode::Nucleo1,
+        target: CanNode::AllNodes,
         request_command: DaqCanCommand::ReqTempData,
         interval: Duration::from_millis(100),
     },

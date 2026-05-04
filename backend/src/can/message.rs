@@ -45,13 +45,6 @@ impl DfrCanId {
             command,
         })
     }
-
-    pub fn to_raw_id(self) -> u32 {
-        ((self.priority as u32) << 26)
-            | ((u8::from(self.target) as u32) << 21)
-            | ((u16::from(self.command) as u32) << 5)
-            | u8::from(self.source) as u32
-    }
 }
 
 impl TryFrom<u32> for DfrCanId {
@@ -78,7 +71,10 @@ impl TryFrom<u32> for DfrCanId {
 
 impl From<DfrCanId> for u32 {
     fn from(value: DfrCanId) -> Self {
-        value.to_raw_id()
+        ((value.priority as u32) << 26)
+            | ((u8::from(value.target) as u32) << 21)
+            | ((u16::from(value.command) as u32) << 5)
+            | u8::from(value.source) as u32
     }
 }
 

@@ -43,7 +43,7 @@ impl CanSocket {
     }
 
     pub async fn write_raw(&self, id: DfrCanId, data: &[u8]) -> Result<(), CanSocketError> {
-        let raw_id = id.to_raw_id();
+        let raw_id: u32 = id.into();
         let extended_id =
             ExtendedId::new(raw_id).ok_or(CanSocketError::InvalidExtendedId(raw_id))?;
         let frame = CanFdFrame::with_flags(extended_id, data, FdFlags::empty())
