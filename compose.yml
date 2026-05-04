@@ -1,18 +1,28 @@
 services:
   can-bridge:
     container_name: can-bridge
+    platform: linux/arm64
     build:
-      context: ./can-bridge
+      context: ./backend
       dockerfile: Dockerfile
     image: ghcr.io/schommie/ev-can-bridge:latest
+    environment:
+      CAN_INTERFACE: can0
+    cap_add:
+      - NET_RAW
+    labels:
+      io.containers.autoupdate: registry
     network_mode: host
     restart: unless-stopped
 
   gui:
     container_name: gui
+    platform: linux/arm64
     build:
       context: ./gui
       dockerfile: Dockerfile
     image: ghcr.io/schommie/ev-gui:latest
+    labels:
+      io.containers.autoupdate: registry
     network_mode: host
     restart: unless-stopped

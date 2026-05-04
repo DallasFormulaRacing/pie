@@ -1,189 +1,271 @@
-use anyhow::{Context, Result};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use socketcan::{
-    tokio::CanFdSocket, CanAnyFrame, CanFdFrame, EmbeddedFrame, ExtendedId, Frame, Id,
-};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::net::TcpListener;
-use tokio::sync::{broadcast, mpsc};
+use std::error::Error;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{Mutex, broadcast};
+use tokio::time;
 use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::protocol::Message;
 
-const SOURCE_PI: u32 = 0x1E;
-const CMD_ID_LED_TOGGLE: u16 = 0x100;
-const CMD_ID_REBOOT: u16 = 0x99;
-const CMD_ID_PING: u16 = 0x001;
-const CMD_ID_PONG: u16 = 0x060;
+mod bridge;
+mod can;
+mod device;
+mod websocket;
+#[cfg(target_os = "linux")]
+use can::socket::CanSocket;
+use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessageBuf};
+use device::DeviceRegistry;
+use websocket::{BackendEvent, BackendEventData, backend_event, encode_outgoing};
+const SERVER_ADDR: &str = "0.0.0.0:9002";
+const DEVICE_STATUS_BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
 
-fn build_arb_id(target: u32, cmd: u16) -> u32 {
-    ((target & 0x1F) << 21) | ((cmd as u32 & 0xFFFF) << 5) | (SOURCE_PI & 0x1F)
-}
+#[cfg(not(target_os = "linux"))]
+#[derive(Clone)]
+struct CanSocket;
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "command", content = "payload")]
-enum UiCommand {
-    #[serde(rename = "TOGGLE_LED")] ToggleLed { node: String, state: bool },
-    #[serde(rename = "REBOOT")] Reboot { node: String },
-    #[serde(rename = "REFRESH_NODES")] RefreshNodes,
-    #[serde(rename = "PING_NODE")] PingNode { node: String },
-}
+#[cfg(not(target_os = "linux"))]
+impl CanSocket {
+    fn open(_interface: &str) -> Result<Self, std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "CAN sockets are only supported on Linux",
+        ))
+    }
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(tag = "type", content = "data")]
-enum UiUpdate {
-    #[serde(rename = "NODE_STATUS")] NodeStatus { node: String, is_online: bool },
+    async fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, std::io::Error> {
+        Ok(None)
+    }
+
+    async fn write_message(&self, _message: &DfrCanMessageBuf) -> Result<(), std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "CAN sockets are only supported on Linux",
+        ))
+    }
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let (ui_tx, ui_rx) = mpsc::channel::<UiCommand>(100);
-    let (broadcast_tx, _) = broadcast::channel::<UiUpdate>(100);
+async fn main() -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind(SERVER_ADDR).await?;
+    println!("pi websocket server listening on ws://{SERVER_ADDR}");
+    let registry = Arc::new(Mutex::new(DeviceRegistry::new()));
+    let can_socket = open_can_socket();
+    let (event_tx, _) = broadcast::channel::<BackendEvent>(128);
 
-    let mut node_registry = HashMap::new();
-    node_registry.insert("NUC_1".to_string(), 0x06);
-    node_registry.insert("NUC_2".to_string(),0x07);
-    node_registry.insert("FL_NODE".to_string(), 0x01);
-    node_registry.insert("FR_NODE".to_string(), 0x02);
-    let node_registry = Arc::new(node_registry);
+    if let Some(socket) = can_socket.clone() {
+        tokio::spawn(can_receive_task(
+            socket.clone(),
+            Arc::clone(&registry),
+            event_tx.clone(),
+        ));
 
-    let node_states = Arc::new(Mutex::new(HashMap::new()));
+        spawn_can_polling_tasks(socket, event_tx.clone());
+    }
 
-    let can_tx = broadcast_tx.clone();
-    let can_nodes = node_registry.clone();
-    let can_states = node_states.clone();
-    tokio::spawn(async move {
-        let _ = run_can_controller(ui_rx, can_tx, can_nodes, can_states).await;
-    });
+    loop {
+        let (stream, addr) = listener.accept().await?;
+        println!("client connected: {addr}");
+        let registry = Arc::clone(&registry);
+        let event_tx = event_tx.clone();
 
-    let listener = TcpListener::bind("0.0.0.0:8080").await.context("Failed to bind")?;
-    println!("DFR Online: ws://0.0.0.0:8080");
-
-    while let Ok((stream, _)) = listener.accept().await {
-        let b_tx = broadcast_tx.clone();
-        let u_tx = ui_tx.clone();
-        let s_ref = node_states.clone();
         tokio::spawn(async move {
-            let _ = handle_ws_client(stream, b_tx, u_tx, s_ref).await;
+            if let Err(error) = handle_client(stream, addr, registry, event_tx).await {
+                eprintln!("client {addr} error: {error}");
+            }
         });
     }
-    Ok(())
 }
 
-async fn run_can_controller(
-    mut ui_rx: mpsc::Receiver<UiCommand>,
-    tx: broadcast::Sender<UiUpdate>,
-    nodes: Arc<HashMap<String, u32>>,
-    node_states: Arc<Mutex<HashMap<String, bool>>>,
-) -> Result<()> {
-    let mut can_socket = CanFdSocket::open("can0").context("Could not open can0")?;
+fn open_can_socket() -> Option<CanSocket> {
+    let interface = std::env::var("CAN_INTERFACE").unwrap_or_else(|_| "can0".to_string());
 
-    loop {
-        tokio::select! {
-            Some(cmd) = ui_rx.recv() => {
-                match cmd {
-                    UiCommand::RefreshNodes => {
-                        for target in nodes.values() {
-                            let arb_id = build_arb_id(*target, CMD_ID_PING);
-                            if let Some(ext_id) = ExtendedId::new(arb_id) {
-                                if let Some(frame) = CanFdFrame::new(Id::Extended(ext_id), &[]) {
-                                    let _ = can_socket.write_frame(&frame).await;
-                                }
-                            }
-                        }
-                    },
-                    UiCommand::PingNode { node } => {
-                        if let Some(&target) = nodes.get(&node) {
-                            let arb_id = build_arb_id(target, CMD_ID_PING);
-                            if let Some(ext_id) = ExtendedId::new(arb_id) {
-                                if let Some(frame) = CanFdFrame::new(Id::Extended(ext_id), &[]) {
-                                    let _ = can_socket.write_frame(&frame).await;
-                                }
-                            }
-                        }
-                    },
-                    UiCommand::ToggleLed { node, state } => {
-                        if let Some(&target) = nodes.get(&node) {
-                            let arb_id = build_arb_id(target, CMD_ID_LED_TOGGLE);
-                            if let Some(ext_id) = ExtendedId::new(arb_id) {
-                                if let Some(frame) = CanFdFrame::new(Id::Extended(ext_id), &[state as u8]) {
-                                    let _ = can_socket.write_frame(&frame).await;
-                                }
-                            }
-                        }
-                    },
-                    UiCommand::Reboot { node } => {
-                        if let Some(&target) = nodes.get(&node) {
-                            let arb_id = build_arb_id(target, CMD_ID_REBOOT);
-                            if let Some(ext_id) = ExtendedId::new(arb_id) {
-                                if let Some(frame) = CanFdFrame::new(Id::Extended(ext_id), &[]) {
-                                    let _ = can_socket.write_frame(&frame).await;
-                                }
-                            }
-                        }
-                    },
-                }
-            }
-            frame = can_socket.next() => {
-                if let Some(Ok(CanAnyFrame::Fd(f))) = frame {
-                    let id = f.raw_id();
-                    let src_id = id & 0x1F; 
-                    let cmd_type = ((id >> 5) & 0xFFFF) as u16;
-
-                    if cmd_type == CMD_ID_PONG || cmd_type == CMD_ID_PING {
-                        if let Some((name, _)) = nodes.iter().find(|&(_, &v)| v == src_id) {
-                            node_states.lock().unwrap().insert(name.clone(), true);
-                            let _ = tx.send(UiUpdate::NodeStatus { node: name.clone(), is_online: true });
-                        }
-                    }
-                }
-            }
+    match CanSocket::open(interface.as_str()) {
+        Ok(socket) => {
+            println!("CAN socket opened on {interface}");
+            Some(socket)
+        }
+        Err(error) => {
+            eprintln!("failed to open CAN socket on {interface}: {error}");
+            None
         }
     }
 }
 
-async fn handle_ws_client(
-    stream: tokio::net::TcpStream,
-    broadcast_tx: broadcast::Sender<UiUpdate>,
-    ui_tx: mpsc::Sender<UiCommand>,
-    node_states: Arc<Mutex<HashMap<String, bool>>>,
-) -> Result<()> {
-    let mut ws = accept_async(stream).await?;
-    
-    // Fix: We create a local vector to avoid holding the Mutex lock across the await point
-    let initial_updates: Vec<String> = {
-        let states = node_states.lock().unwrap();
-        states.iter()
-            .map(|(name, &is_online)| {
-                let update = UiUpdate::NodeStatus { node: name.clone(), is_online };
-                serde_json::to_string(&update).unwrap_or_default()
-            })
-            .filter(|s| !s.is_empty())
-            .collect()
+async fn handle_client(
+    stream: TcpStream,
+    addr: SocketAddr,
+    registry: Arc<Mutex<DeviceRegistry>>,
+    event_tx: broadcast::Sender<BackendEvent>,
+) -> Result<(), Box<dyn Error>> {
+    let ws = accept_async(stream).await?;
+    let (mut ws_tx, mut ws_rx) = ws.split();
+    let mut event_rx = event_tx.subscribe();
+
+    let snapshot = {
+        let registry = registry.lock().await;
+        bridge::device_status_snapshot(&registry, Instant::now())
     };
-
-    for msg_text in initial_updates {
-        ws.send(Message::Text(msg_text.into())).await?;
-    }
-
-    let mut rx_sub = broadcast_tx.subscribe();
+    ws_tx.send(encode_outgoing(&snapshot)?).await?;
 
     loop {
         tokio::select! {
-            msg = rx_sub.recv() => {
-                if let Ok(update) = msg {
-                    let _ = ws.send(Message::Text(serde_json::to_string(&update)?.into())).await;
+            message = ws_rx.next() => {
+                let Some(message) = message else {
+                    break;
+                };
+
+                match message {
+                    Ok(frame) => {
+                        if frame.is_close() {
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("client {addr} rx error: {error}");
+                        break;
+                    }
                 }
             }
-            msg = ws.next() => {
-                if let Some(Ok(Message::Text(text))) = msg {
-                    if let Ok(cmd) = serde_json::from_str::<UiCommand>(&text) {
-                        let _ = ui_tx.send(cmd).await;
+            event = event_rx.recv() => {
+                match event {
+                    Ok(event) => ws_tx.send(encode_outgoing(&event)?).await?,
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        let event = backend_event(BackendEventData::BackendError {
+                            message: format!("websocket client skipped {skipped} backend events"),
+                        });
+                        ws_tx.send(encode_outgoing(&event)?).await?;
                     }
-                } else { break; }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        };
+    }
+
+    println!("client disconnected: {addr}");
+    Ok(())
+}
+
+async fn can_receive_task(
+    socket: CanSocket,
+    registry: Arc<Mutex<DeviceRegistry>>,
+    event_tx: broadcast::Sender<BackendEvent>,
+) {
+    let mut last_status_broadcast = HashMap::<CanNode, Instant>::new();
+
+    loop {
+        match socket.read_message().await {
+            Ok(Some(message)) => {
+                let now = Instant::now();
+                let should_broadcast_status = last_status_broadcast
+                    .get(&message.id.source)
+                    .map(|last_broadcast| {
+                        now.duration_since(*last_broadcast) >= DEVICE_STATUS_BROADCAST_INTERVAL
+                    })
+                    .unwrap_or(true);
+
+                let status_event = if should_broadcast_status {
+                    let mut registry = registry.lock().await;
+                    registry.mark_seen(message.id.source, now);
+                    bridge::device_status_changed(&registry, message.id.source, now)
+                } else {
+                    let mut registry = registry.lock().await;
+                    registry.mark_seen(message.id.source, now);
+                    None
+                };
+
+                if let Some(event) = status_event {
+                    last_status_broadcast.insert(message.id.source, now);
+                    let _ = event_tx.send(event);
+                }
+
+                match bridge::telemetry_event_for_can_message(&message) {
+                    Ok(Some(event)) => {
+                        let _ = event_tx.send(event);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        let event = backend_event(BackendEventData::BackendError {
+                            message: format!("failed to decode CAN telemetry: {error}"),
+                        });
+                        let _ = event_tx.send(event);
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                let event = backend_event(BackendEventData::BackendError {
+                    message: format!("CAN socket read error: {error}"),
+                });
+                let _ = event_tx.send(event);
+                break;
             }
         }
     }
-    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CanPollingSchedule {
+    target: CanNode,
+    request_command: DaqCanCommand,
+    interval: Duration,
+}
+
+const CAN_POLLING_SCHEDULES: &[CanPollingSchedule] = &[
+    CanPollingSchedule {
+        target: CanNode::Nucleo1,
+        request_command: DaqCanCommand::ReqImuData,
+        interval: Duration::from_millis(20),
+    },
+    CanPollingSchedule {
+        target: CanNode::Nucleo1,
+        request_command: DaqCanCommand::ReqTempData,
+        interval: Duration::from_millis(100),
+    },
+];
+
+fn spawn_can_polling_tasks(socket: CanSocket, event_tx: broadcast::Sender<BackendEvent>) {
+    for schedule in CAN_POLLING_SCHEDULES {
+        let socket = socket.clone();
+        let event_tx = event_tx.clone();
+        let schedule = *schedule;
+
+        tokio::spawn(async move {
+            can_polling_task(socket, schedule, event_tx).await;
+        });
+    }
+}
+
+async fn can_polling_task(
+    socket: CanSocket,
+    schedule: CanPollingSchedule,
+    event_tx: broadcast::Sender<BackendEvent>,
+) {
+    let mut interval = time::interval(schedule.interval);
+    interval.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
+
+    loop {
+        interval.tick().await;
+
+        let message = DfrCanMessageBuf {
+            id: DfrCanId {
+                priority: 1,
+                target: schedule.target,
+                source: CanNode::Raspi,
+                command: CanCommand::Daq(schedule.request_command),
+            },
+            data: Vec::new(),
+        };
+
+        if let Err(error) = socket.write_message(&message).await {
+            let event = backend_event(BackendEventData::BackendError {
+                message: format!(
+                    "failed to send CAN polling request {:?} to {:?}: {error}",
+                    schedule.request_command, schedule.target,
+                ),
+            });
+            let _ = event_tx.send(event);
+        }
+    }
 }
