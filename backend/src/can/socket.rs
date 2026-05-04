@@ -6,7 +6,7 @@ use socketcan::frame::FdFlags;
 use socketcan::tokio::CanFdSocket;
 use socketcan::{CanAnyFrame, CanFdFrame};
 
-use super::*;
+use super::{CanMessageError, DfrCanId, DfrCanMessage};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CanSocketError {
@@ -60,7 +60,7 @@ impl TryFrom<CanFdFrame> for DfrCanMessage {
     fn try_from(frame: CanFdFrame) -> Result<Self, Self::Error> {
         let id = match frame.id() {
             Id::Extended(id) => DfrCanId::try_from(id.as_raw())?,
-            _ => return Err(CanMessageError::NotExtendedId),
+            Id::Standard(_) => return Err(CanMessageError::NotExtendedId),
         };
 
         Ok(DfrCanMessage {
@@ -85,17 +85,17 @@ impl TryFrom<CanAnyFrame> for DfrCanMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::can::{BmsCanCommand, CanCommand, CanNode, CommonCanCommand, DaqCanCommand};
     use embedded_can::{ExtendedId, StandardId};
     use socketcan::CanDataFrame;
 
     fn raw_id(priority: u8, target: CanNode, command: CanCommand, source: CanNode) -> u32 {
-        DfrCanId {
+        u32::from(DfrCanId {
             priority,
             target,
             source,
             command,
-        }
-        .to_raw_id()
+        })
     }
 
     fn fd_frame(
@@ -120,7 +120,7 @@ mod tests {
             &[0xAA, 0xBB],
         );
 
-        let message = DfrCanMessage::try_from(&frame).expect("frame should parse");
+        let message = DfrCanMessage::try_from(frame).expect("frame should parse");
 
         assert_eq!(message.id.priority, 1);
         assert_eq!(message.id.target, CanNode::Raspi);
@@ -177,7 +177,7 @@ mod tests {
         let id = StandardId::new(0x123).expect("valid standard ID");
         let frame = CanFdFrame::new(id, &[1, 2, 3]).expect("FD frame");
 
-        let error = DfrCanMessage::try_from(&frame).expect_err("standard IDs are not DFR IDs");
+        let error = DfrCanMessage::try_from(frame).expect_err("standard IDs are not DFR IDs");
 
         assert_eq!(error, CanMessageError::NotExtendedId);
     }
@@ -191,7 +191,7 @@ mod tests {
         let id = ExtendedId::new(raw_id).expect("raw ID should still be a valid extended ID");
         let frame = CanFdFrame::new(id, &[]).expect("FD frame");
 
-        let error = DfrCanMessage::try_from(&frame).expect_err("unknown node should be rejected");
+        let error = DfrCanMessage::try_from(frame).expect_err("unknown node should be rejected");
 
         assert_eq!(error, CanMessageError::UnknownNode(0x12));
     }
@@ -205,8 +205,7 @@ mod tests {
         let id = ExtendedId::new(raw_id).expect("raw ID should still be a valid extended ID");
         let frame = CanFdFrame::new(id, &[]).expect("FD frame");
 
-        let error =
-            DfrCanMessage::try_from(&frame).expect_err("unknown command should be rejected");
+        let error = DfrCanMessage::try_from(frame).expect_err("unknown command should be rejected");
 
         assert_eq!(error, CanMessageError::UnknownCommand(0x1234));
     }
@@ -224,7 +223,7 @@ mod tests {
             ],
         );
 
-        let message = DfrCanMessage::try_from(&frame).expect("frame ID should parse");
+        let message = DfrCanMessage::try_from(frame).expect("frame ID should parse");
 
         assert_eq!(
             message.id.command,
@@ -246,7 +245,7 @@ mod tests {
             ],
         );
 
-        let message = DfrCanMessage::try_from(&frame).expect("frame ID should parse");
+        let message = DfrCanMessage::try_from(frame).expect("frame ID should parse");
 
         assert_eq!(
             message.id.command,

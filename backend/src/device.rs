@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::can::{CanNode, CanSystem};
 use crate::websocket::DeviceStatus;
@@ -32,9 +32,9 @@ impl TrackedDevice {
             name: self.name.to_string(),
             system: system_name(self.system).to_string(),
             online: self.online,
-            last_seen_ms_ago: self
-                .last_seen
-                .map(|last_seen| now.duration_since(last_seen).as_millis() as u64),
+            last_seen_ms_ago: self.last_seen.map(|last_seen| {
+                u64::try_from(now.duration_since(last_seen).as_millis()).unwrap_or(u64::MAX)
+            }),
             last_error: self.last_error.clone(),
         }
     }
@@ -75,20 +75,6 @@ impl DeviceRegistry {
         device.last_error = error;
         Some(device)
     }
-
-    pub fn mark_timeouts(&mut self, now: Instant, timeout: Duration) {
-        for device in self.devices.values_mut() {
-            let is_stale = device
-                .last_seen
-                .map(|last_seen| now.duration_since(last_seen) > timeout)
-                .unwrap_or(true);
-
-            if is_stale {
-                device.online = false;
-            }
-        }
-    }
-
     pub fn online(&self) -> impl Iterator<Item = &TrackedDevice> {
         self.devices.values().filter(|device| device.online)
     }
@@ -160,18 +146,6 @@ mod tests {
         assert!(bms.online);
         assert_eq!(bms.last_seen, Some(now));
     }
-
-    #[test]
-    fn timeout_marks_stale_devices_offline() {
-        let mut registry = DeviceRegistry::new();
-        let now = Instant::now();
-
-        registry.mark_seen(CanNode::Bms, now).expect("bms exists");
-        registry.mark_timeouts(now + Duration::from_secs(3), Duration::from_secs(2));
-
-        assert!(!registry.get(CanNode::Bms).expect("bms exists").online);
-    }
-
     #[test]
     fn online_and_offline_iterators_track_status() {
         let mut registry = DeviceRegistry::new();

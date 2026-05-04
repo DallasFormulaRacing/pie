@@ -13,43 +13,18 @@ mod bridge;
 mod can;
 mod device;
 mod websocket;
-#[cfg(target_os = "linux")]
 use can::socket::CanSocket;
-use can::*;
-use device::*;
-use websocket::*;
+use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessage};
+use device::DeviceRegistry;
+use websocket::{BackendEvent, BackendEventData, backend_event, encode_outgoing};
 const SERVER_ADDR: &str = "0.0.0.0:9002";
 const DEVICE_STATUS_BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
 
-#[cfg(not(target_os = "linux"))]
-#[derive(Clone)]
-struct CanSocket;
-
-#[cfg(not(target_os = "linux"))]
-impl CanSocket {
-    fn open(_interface: &str) -> Result<Self, std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "CAN sockets are only supported on Linux",
-        ))
-    }
-
-    async fn read_message(&self) -> Result<Option<DfrCanMessage>, std::io::Error> {
-        Ok(None)
-    }
-
-    async fn write_message(&self, _message: &DfrCanMessage) -> Result<(), std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "CAN sockets are only supported on Linux",
-        ))
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(SERVER_ADDR).await?;
-    println!("pi websocket server listening on ws://{SERVER_ADDR}");
+    tracing::info!("pi websocket server listening on ws://{SERVER_ADDR}");
     let registry = Arc::new(Mutex::new(DeviceRegistry::new()));
     let can_socket = open_can_socket();
     let (event_tx, _) = broadcast::channel::<BackendEvent>(128);
@@ -61,18 +36,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             event_tx.clone(),
         ));
 
-        spawn_can_polling_tasks(socket, event_tx.clone());
+        spawn_can_polling_tasks(&socket, &event_tx);
     }
 
     loop {
         let (stream, addr) = listener.accept().await?;
-        println!("client connected: {addr}");
+        tracing::info!("client connected: {addr}");
         let registry = Arc::clone(&registry);
         let event_tx = event_tx.clone();
 
         tokio::spawn(async move {
             if let Err(error) = handle_client(stream, addr, registry, event_tx).await {
-                eprintln!("client {addr} error: {error}");
+                tracing::error!("client {addr} error: {error}");
             }
         });
     }
@@ -83,11 +58,11 @@ fn open_can_socket() -> Option<CanSocket> {
 
     match CanSocket::open(interface.as_str()) {
         Ok(socket) => {
-            println!("CAN socket opened on {interface}");
+            tracing::info!("CAN socket opened on {interface}");
             Some(socket)
         }
         Err(error) => {
-            eprintln!("failed to open CAN socket on {interface}: {error}");
+            tracing::error!("failed to open CAN socket on {interface}: {error}");
             None
         }
     }
@@ -123,7 +98,7 @@ async fn handle_client(
                         }
                     }
                     Err(error) => {
-                        eprintln!("client {addr} rx error: {error}");
+                        tracing::error!("client {addr} rx error: {error}");
                         break;
                     }
                 }
@@ -143,7 +118,7 @@ async fn handle_client(
         };
     }
 
-    println!("client disconnected: {addr}");
+    tracing::info!("client disconnected: {addr}");
     Ok(())
 }
 
@@ -160,10 +135,9 @@ async fn can_receive_task(
                 let now = Instant::now();
                 let should_broadcast_status = last_status_broadcast
                     .get(&message.id.source)
-                    .map(|last_broadcast| {
+                    .is_none_or(|last_broadcast| {
                         now.duration_since(*last_broadcast) >= DEVICE_STATUS_BROADCAST_INTERVAL
-                    })
-                    .unwrap_or(true);
+                    });
 
                 let status_event = if should_broadcast_status {
                     let mut registry = registry.lock().await;
@@ -225,7 +199,7 @@ const CAN_POLLING_SCHEDULES: &[CanPollingSchedule] = &[
     },
 ];
 
-fn spawn_can_polling_tasks(socket: CanSocket, event_tx: broadcast::Sender<BackendEvent>) {
+fn spawn_can_polling_tasks(socket: &CanSocket, event_tx: &broadcast::Sender<BackendEvent>) {
     for schedule in CAN_POLLING_SCHEDULES {
         let socket = socket.clone();
         let event_tx = event_tx.clone();

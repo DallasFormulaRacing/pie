@@ -5,12 +5,13 @@ edition = "2024"
 
 [dependencies]
 futures-util = "0.3.32"
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.52.1", features = ["full"] }
 tokio-tungstenite = "0.29.0"
 thiserror = "2.0.18"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 ts-rs = { version = "12.0", features = ["no-serde-warnings"] }
+tracing = "0.1.44"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 embedded-can = "0.4.1"
@@ -23,7 +24,7 @@ unsafe_code = "forbid"
 
 [lints.clippy]
 pedantic = "warn"
-cargo = "warn"
+#cargo = "warn"
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"

@@ -56,10 +56,10 @@ impl TryFrom<u32> for DfrCanId {
 
 impl From<DfrCanId> for u32 {
     fn from(value: DfrCanId) -> Self {
-        ((value.priority as u32) << 26)
-            | ((u8::from(value.target) as u32) << 21)
-            | ((u16::from(value.command) as u32) << 5)
-            | u8::from(value.source) as u32
+        (u32::from(value.priority) << 26)
+            | (u32::from(u8::from(value.target)) << 21)
+            | (u32::from(u16::from(value.command)) << 5)
+            | u32::from(u8::from(value.source))
     }
 }
 

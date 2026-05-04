@@ -1,9 +1,13 @@
 use std::array;
 use std::time::Instant;
 
-use crate::can::*;
-use crate::device::*;
-use crate::websocket::*;
+use crate::can::{CanCommand, CanNode, DaqCanCommand, DfrCanMessage};
+use crate::device::DeviceRegistry;
+use crate::websocket::{
+    Acceleration, AngularAcceleration, BackendEvent, BackendEventData, Celsius, DaqTelemetry,
+    Device, IMU_SAMPLE_COUNT, ImuSample, TEMPERATURE_SAMPLE_COUNT, TemperatureSample,
+    backend_event,
+};
 
 const IMU_PAYLOAD_LEN: usize = 60;
 const TEMPERATURE_PAYLOAD_LEN: usize = 64;
@@ -102,8 +106,11 @@ fn decode_temperature_telemetry(
         .ok_or(TelemetryDecodeError::UnsupportedSource(message.id.source))?;
 
     let samples = array::from_fn(|index| {
-        let tire = read_i16(&message.data, TIRE_TEMPERATURE_OFFSET + index * 2) as f32 / 10.0;
-        let brake = read_i16(&message.data, BRAKE_TEMPERATURE_OFFSET + index * 2) as f32 / 10.0;
+        let tire = f32::from(read_i16(&message.data, TIRE_TEMPERATURE_OFFSET + index * 2)) / 10.0;
+        let brake = f32::from(read_i16(
+            &message.data,
+            BRAKE_TEMPERATURE_OFFSET + index * 2,
+        )) / 10.0;
 
         TemperatureSample {
             tire: Celsius(tire),
@@ -117,7 +124,7 @@ fn decode_temperature_telemetry(
 fn read_imu_axes(data: &[u8], offset: usize) -> [f32; IMU_AXES_PER_SAMPLE] {
     array::from_fn(|axis| {
         let start = offset + axis * IMU_AXIS_BYTES;
-        read_i16(data, start) as f32
+        f32::from(read_i16(data, start))
     })
 }
 
