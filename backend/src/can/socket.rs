@@ -33,12 +33,12 @@ impl CanSocket {
         })
     }
 
-    pub async fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, CanSocketError> {
+    pub async fn read_message(&self) -> Result<Option<DfrCanMessage>, CanSocketError> {
         let frame = self.socket.read_frame().await?;
-        Ok(DfrCanMessageBuf::try_from(frame).ok())
+        Ok(DfrCanMessage::try_from(frame).ok())
     }
 
-    pub async fn write_message(&self, message: &DfrCanMessageBuf) -> Result<(), CanSocketError> {
+    pub async fn write_message(&self, message: &DfrCanMessage) -> Result<(), CanSocketError> {
         self.write_raw(message.id, message.data.as_slice()).await
     }
 
@@ -54,10 +54,10 @@ impl CanSocket {
     }
 }
 
-impl<'a> TryFrom<&'a CanFdFrame> for DfrCanMessage<'a> {
+impl TryFrom<CanFdFrame> for DfrCanMessage {
     type Error = CanMessageError;
 
-    fn try_from(frame: &'a CanFdFrame) -> Result<Self, Self::Error> {
+    fn try_from(frame: CanFdFrame) -> Result<Self, Self::Error> {
         let id = match frame.id() {
             Id::Extended(id) => DfrCanId::try_from(id.as_raw())?,
             _ => return Err(CanMessageError::NotExtendedId),
@@ -65,12 +65,12 @@ impl<'a> TryFrom<&'a CanFdFrame> for DfrCanMessage<'a> {
 
         Ok(DfrCanMessage {
             id,
-            data: frame.data(),
+            data: frame.data().to_vec(),
         })
     }
 }
 
-impl TryFrom<CanAnyFrame> for DfrCanMessageBuf {
+impl TryFrom<CanAnyFrame> for DfrCanMessage {
     type Error = CanMessageError;
 
     fn try_from(frame: CanAnyFrame) -> Result<Self, Self::Error> {
@@ -78,7 +78,7 @@ impl TryFrom<CanAnyFrame> for DfrCanMessageBuf {
             return Err(CanMessageError::NonFdFrame);
         };
 
-        Ok(DfrCanMessage::try_from(&frame)?.to_buf())
+        Ok(DfrCanMessage::try_from(frame)?)
     }
 }
 
@@ -142,7 +142,7 @@ mod tests {
             &[1, 2, 3, 4],
         );
 
-        let message = DfrCanMessageBuf::try_from(CanAnyFrame::Fd(frame))
+        let message = DfrCanMessage::try_from(CanAnyFrame::Fd(frame))
             .expect("FD frame should parse into owned DFR message");
 
         assert_eq!(message.id.priority, 2);
@@ -166,7 +166,7 @@ mod tests {
         let id = ExtendedId::new(raw_id).expect("raw DFR ID should be a valid extended ID");
         let classic_frame = CanDataFrame::new(id, &[1, 2, 3]).expect("classic frame");
 
-        let error = DfrCanMessageBuf::try_from(CanAnyFrame::Normal(classic_frame))
+        let error = DfrCanMessage::try_from(CanAnyFrame::Normal(classic_frame))
             .expect_err("classic CAN frames should be discarded");
 
         assert_eq!(error, CanMessageError::NonFdFrame);

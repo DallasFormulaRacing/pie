@@ -15,9 +15,9 @@ mod device;
 mod websocket;
 #[cfg(target_os = "linux")]
 use can::socket::CanSocket;
-use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessageBuf};
-use device::DeviceRegistry;
-use websocket::{BackendEvent, BackendEventData, backend_event, encode_outgoing};
+use can::*;
+use device::*;
+use websocket::*;
 const SERVER_ADDR: &str = "0.0.0.0:9002";
 const DEVICE_STATUS_BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -34,11 +34,11 @@ impl CanSocket {
         ))
     }
 
-    async fn read_message(&self) -> Result<Option<DfrCanMessageBuf>, std::io::Error> {
+    async fn read_message(&self) -> Result<Option<DfrCanMessage>, std::io::Error> {
         Ok(None)
     }
 
-    async fn write_message(&self, _message: &DfrCanMessageBuf) -> Result<(), std::io::Error> {
+    async fn write_message(&self, _message: &DfrCanMessage) -> Result<(), std::io::Error> {
         Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "CAN sockets are only supported on Linux",
@@ -248,7 +248,7 @@ async fn can_polling_task(
     loop {
         interval.tick().await;
 
-        let message = DfrCanMessageBuf {
+        let message = DfrCanMessage {
             id: DfrCanId {
                 priority: 1,
                 target: schedule.target,

@@ -1,13 +1,9 @@
 use std::array;
 use std::time::Instant;
 
-use crate::can::{CanCommand, CanNode, DaqCanCommand, DfrCanMessageBuf};
-use crate::device::DeviceRegistry;
-use crate::websocket::{
-    Acceleration, AngularAcceleration, BackendEvent, BackendEventData, Celsius, DaqTelemetry,
-    Device, IMU_SAMPLE_COUNT, ImuSample, TEMPERATURE_SAMPLE_COUNT, TemperatureSample,
-    backend_event,
-};
+use crate::can::*;
+use crate::device::*;
+use crate::websocket::*;
 
 const IMU_PAYLOAD_LEN: usize = 60;
 const TEMPERATURE_PAYLOAD_LEN: usize = 64;
@@ -39,7 +35,7 @@ pub fn device_status_changed(
 }
 
 pub fn telemetry_event_for_can_message(
-    message: &DfrCanMessageBuf,
+    message: &DfrCanMessage,
 ) -> Result<Option<BackendEvent>, TelemetryDecodeError> {
     match message.id.command {
         CanCommand::Daq(DaqCanCommand::ImuData) => {
@@ -58,7 +54,7 @@ pub fn telemetry_event_for_can_message(
     }
 }
 
-fn decode_imu_telemetry(message: &DfrCanMessageBuf) -> Result<DaqTelemetry, TelemetryDecodeError> {
+fn decode_imu_telemetry(message: &DfrCanMessage) -> Result<DaqTelemetry, TelemetryDecodeError> {
     if message.data.len() < IMU_PAYLOAD_LEN {
         return Err(TelemetryDecodeError::PayloadTooShort {
             command: "DAQ IMU",
@@ -92,7 +88,7 @@ fn decode_imu_telemetry(message: &DfrCanMessageBuf) -> Result<DaqTelemetry, Tele
 }
 
 fn decode_temperature_telemetry(
-    message: &DfrCanMessageBuf,
+    message: &DfrCanMessage,
 ) -> Result<DaqTelemetry, TelemetryDecodeError> {
     if message.data.len() < TEMPERATURE_PAYLOAD_LEN {
         return Err(TelemetryDecodeError::PayloadTooShort {
@@ -163,8 +159,8 @@ mod tests {
     use super::*;
     use crate::can::{CanCommand, DaqCanCommand, DfrCanId};
 
-    fn daq_message(command: DaqCanCommand, data: Vec<u8>) -> DfrCanMessageBuf {
-        DfrCanMessageBuf {
+    fn daq_message(command: DaqCanCommand, data: Vec<u8>) -> DfrCanMessage {
+        DfrCanMessage {
             id: DfrCanId {
                 priority: 1,
                 target: CanNode::Raspi,
@@ -175,7 +171,7 @@ mod tests {
         }
     }
 
-    fn imu_message(data: Vec<u8>) -> DfrCanMessageBuf {
+    fn imu_message(data: Vec<u8>) -> DfrCanMessage {
         daq_message(DaqCanCommand::ImuData, data)
     }
 

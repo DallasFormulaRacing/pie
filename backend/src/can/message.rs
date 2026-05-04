@@ -1,22 +1,7 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DfrCanMessage<'a> {
-    pub id: DfrCanId,
-    pub data: &'a [u8],
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DfrCanMessageBuf {
+pub struct DfrCanMessage {
     pub id: DfrCanId,
     pub data: Vec<u8>,
-}
-
-impl DfrCanMessageBuf {
-    pub fn as_message(&self) -> DfrCanMessage<'_> {
-        DfrCanMessage {
-            id: self.id,
-            data: self.data.as_slice(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,32 +63,10 @@ impl From<DfrCanId> for u32 {
     }
 }
 
-impl<'a> DfrCanMessage<'a> {
-    pub fn new(
-        priority: u8,
-        target: CanNode,
-        source: CanNode,
-        command: CanCommand,
-        data: &'a [u8],
-    ) -> Result<Self, CanMessageError> {
-        Ok(Self {
-            id: DfrCanId::new(priority, target, source, command)?,
-            data,
-        })
-    }
-
-    pub fn to_buf(self) -> DfrCanMessageBuf {
-        DfrCanMessageBuf {
-            id: self.id,
-            data: self.data.to_vec(),
-        }
-    }
-}
-
-impl<'a> TryFrom<(u32, &'a [u8])> for DfrCanMessage<'a> {
+impl TryFrom<(u32, Vec<u8>)> for DfrCanMessage {
     type Error = CanMessageError;
 
-    fn try_from((id, data): (u32, &'a [u8])) -> Result<Self, Self::Error> {
+    fn try_from((id, data): (u32, Vec<u8>)) -> Result<Self, Self::Error> {
         Ok(Self {
             id: DfrCanId::try_from(id)?,
             data,
