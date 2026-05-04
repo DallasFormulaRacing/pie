@@ -78,7 +78,7 @@ impl TryFrom<CanAnyFrame> for DfrCanMessage {
             return Err(CanMessageError::NonFdFrame);
         };
 
-        Ok(DfrCanMessage::try_from(frame)?)
+        DfrCanMessage::try_from(frame)
     }
 }
 
