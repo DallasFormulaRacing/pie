@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::can::{CanNode, CanSystem};
-use crate::websocket::DeviceStatus;
+use crate::websocket::{DeviceStatus, BackendEvent, backend_event, BackendEventData};
 
 #[derive(Debug, Clone)]
 pub struct TrackedDevice {
@@ -100,6 +100,23 @@ impl Default for DeviceRegistry {
     }
 }
 
+pub fn device_status_snapshot(registry: &DeviceRegistry, now: Instant) -> BackendEvent {
+    backend_event(BackendEventData::DeviceRegistrySnapshot {
+        devices: registry.snapshot(now),
+    })
+}
+
+pub fn device_status_changed(
+    registry: &DeviceRegistry,
+    node: CanNode,
+    now: Instant,
+) -> Option<BackendEvent> {
+    let device = registry.get(node)?;
+    Some(backend_event(BackendEventData::DeviceStatusChanged {
+        device: device.status(now),
+    }))
+}
+
 fn known_devices() -> [TrackedDevice; 9] {
     [
         TrackedDevice::new(CanNode::FrontLeft, CanSystem::Daq, "Front Left DAQ"),
@@ -126,6 +143,17 @@ fn system_name(system: CanSystem) -> &'static str {
 mod tests {
     use super::*;
 
+    #[test]
+    fn device_status_snapshot_uses_backend_envelope() {
+        let registry = DeviceRegistry::new();
+
+        let event = device_status_snapshot(&registry, Instant::now());
+
+        assert!(matches!(
+            event.data,
+            BackendEventData::DeviceRegistrySnapshot { .. }
+        ));
+    }
     #[test]
     fn known_devices_initialize_offline() {
         let registry = DeviceRegistry::new();

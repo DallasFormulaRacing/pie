@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::can::{AxisSample, CanData, CanNode, DaqData, DaqImuSample, DaqTemperatureSample};
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -195,9 +197,85 @@ pub fn backend_event(data: BackendEventData) -> BackendEvent {
     }
 }
 
+impl From<CanData> for BackendEventData {
+    fn from(value: CanData) -> Self {
+        match value {
+            CanData::Daq(data) => Self::DaqTelemetry {
+                telemetry: data.into(),
+            },
+            CanData::Bms(data) => match data {},
+        }
+    }
+}
+
+impl From<DaqData> for DaqTelemetry {
+    fn from(value: DaqData) -> Self {
+        match value {
+            DaqData::Temperature { source, samples } => Self::Temperature {
+                source: daq_node_to_device(source),
+                samples: samples.map(TemperatureSample::from),
+            },
+            DaqData::Imu { source, samples } => Self::Imu {
+                source: daq_node_to_device(source),
+                samples: samples.map(ImuSample::from),
+            },
+        }
+    }
+}
+
+impl From<DaqTemperatureSample> for TemperatureSample {
+    fn from(value: DaqTemperatureSample) -> Self {
+        Self {
+            tire: Celsius(value.tire_celsius),
+            brake: Celsius(value.brake_celsius),
+        }
+    }
+}
+
+impl From<DaqImuSample> for ImuSample {
+    fn from(value: DaqImuSample) -> Self {
+        Self {
+            acceleration: acceleration_from_axis(value.acceleration_g),
+            angular_acceleration: angular_acceleration_from_axis(value.angular_rate_dps),
+        }
+    }
+}
+
+fn acceleration_from_axis(value: AxisSample) -> Acceleration {
+    Acceleration {
+        x: value.x,
+        y: value.y,
+        z: value.z,
+    }
+}
+
+fn angular_acceleration_from_axis(value: AxisSample) -> AngularAcceleration {
+    AngularAcceleration {
+        rho: value.x,
+        theta: value.y,
+        phi: value.z,
+    }
+}
+
+fn daq_node_to_device(node: CanNode) -> Device {
+    match node {
+        CanNode::FrontLeft => Device::NodeFL,
+        CanNode::FrontRight => Device::NodeFR,
+        CanNode::RearLeft => Device::NodeRL,
+        CanNode::RearRight => Device::NodeRR,
+        CanNode::Nucleo1 => Device::Nucleo1,
+        CanNode::Nucleo2 => Device::Nucleo2,
+        CanNode::Dash => Device::NodeDash,
+        CanNode::AllNodes | CanNode::Vcu | CanNode::Bms | CanNode::Raspi => {
+            unreachable!("DAQ data can only be decoded from DAQ source nodes")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::can::{CanCommand, CanData, CanNode, DaqCanCommand, DfrCanId, DfrCanMessage};
 
     #[test]
     fn serializes_backend_device_status_snapshot() {
@@ -250,5 +328,28 @@ mod tests {
             json["data"]["telemetry"]["samples"][0]["acceleration"]["x"],
             1.0
         );
+    }
+
+    #[test]
+    fn serializes_daq_can_data_as_existing_daq_telemetry_shape() {
+        let message = DfrCanMessage {
+            id: DfrCanId {
+                priority: 1,
+                target: CanNode::Raspi,
+                source: CanNode::FrontLeft,
+                command: CanCommand::Daq(DaqCanCommand::TempData),
+            },
+            data: vec![0; 64],
+        };
+        let can_data = CanData::Daq(DaqData::try_from(&message).expect("payload should decode"));
+        let event = backend_event(can_data.into());
+
+        let json = serde_json::to_value(&event).expect("event should serialize");
+
+        assert_eq!(json["system"], "backend");
+        assert_eq!(json["device"], "raspi");
+        assert_eq!(json["data"]["type"], "daqTelemetry");
+        assert_eq!(json["data"]["telemetry"]["type"], "temperature");
+        assert_eq!(json["data"]["telemetry"]["source"], "nodeFL");
     }
 }

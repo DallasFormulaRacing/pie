@@ -9,17 +9,15 @@ use tokio::sync::{Mutex, broadcast};
 use tokio::time;
 use tokio_tungstenite::accept_async;
 
-mod bridge;
 mod can;
 mod device;
 mod websocket;
 use can::socket::CanSocket;
-use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessage};
+use can::{CanCommand, CanNode, DaqCanCommand, DfrCanId, DfrCanMessage, data_for_message};
 use device::DeviceRegistry;
 use websocket::{BackendEvent, BackendEventData, backend_event, encode_outgoing};
 const SERVER_ADDR: &str = "0.0.0.0:9002";
 const DEVICE_STATUS_BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -80,7 +78,7 @@ async fn handle_client(
 
     let snapshot = {
         let registry = registry.lock().await;
-        bridge::device_status_snapshot(&registry, Instant::now())
+        device::device_status_snapshot(&registry, Instant::now())
     };
     ws_tx.send(encode_outgoing(&snapshot)?).await?;
 
@@ -142,7 +140,7 @@ async fn can_receive_task(
                 let status_event = if should_broadcast_status {
                     let mut registry = registry.lock().await;
                     registry.mark_seen(message.id.source, now);
-                    bridge::device_status_changed(&registry, message.id.source, now)
+                    device::device_status_changed(&registry, message.id.source, now)
                 } else {
                     let mut registry = registry.lock().await;
                     registry.mark_seen(message.id.source, now);
@@ -154,9 +152,9 @@ async fn can_receive_task(
                     let _ = event_tx.send(event);
                 }
 
-                match bridge::telemetry_event_for_can_message(&message) {
-                    Ok(Some(event)) => {
-                        let _ = event_tx.send(event);
+                match data_for_message(&message) {
+                    Ok(Some(data)) => {
+                        let _ = event_tx.send(backend_event(data.into()));
                     }
                     Ok(None) => {}
                     Err(error) => {
