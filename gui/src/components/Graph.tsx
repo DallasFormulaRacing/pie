@@ -35,18 +35,53 @@ export const LiveTestGraph = ({
     () => [time, ...series.map((item) => item.values)] as uPlot.AlignedData,
     [time, series],
   );
-  const hasData = time.length > 0 && series.some((item) => item.values.length > 0);
+  const hasData =
+    time.length > 0 && series.some((item) => item.values.length > 0);
 
   const options: uPlot.Options = useMemo(
     () => ({
       width: 500,
       height: 300,
       series: [
-        {},
+        {
+          value: (
+            u: uPlot,
+            val: number | null,
+            _sIdx: number,
+            idx: number | null,
+          ) => {
+            const data = u.data[0];
+            const timeVal =
+              idx == null
+                ? data && data.length > 0
+                  ? data[data.length - 1]
+                  : null
+                : val;
+            return timeVal != null
+              ? new Date(timeVal * 1000).toLocaleTimeString()
+              : "--";
+          },
+        },
         ...series.map((item) => ({
           label: item.label,
           stroke: item.stroke,
           width: 2,
+          value: (
+            u: uPlot,
+            val: number | null,
+            sIdx: number,
+            idx: number | null,
+          ) => {
+            if (idx == null) {
+              const data = u.data[sIdx];
+              if (data && data.length > 0) {
+                const lastVal = data[data.length - 1];
+                return lastVal != null ? lastVal.toFixed(2) : "--";
+              }
+              return "--";
+            }
+            return val != null ? val.toFixed(2) : "--";
+          },
         })),
       ],
       axes: [
