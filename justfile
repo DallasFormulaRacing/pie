@@ -5,7 +5,7 @@ build:
     @bash -u -o pipefail -c 'status=0; just build-backend & backend=$!; just build-gui & gui=$!; wait $backend || status=$?; wait $gui || status=$?; exit $status'
 
 build-backend:
-    podman build --platform linux/arm64 -t {{registry}}/ev-can-bridge:latest ./backend_v3/backend
+    podman build --platform linux/arm64 -t {{registry}}/ev-can-bridge:latest ./backend
 
 build-gui:
     podman build --platform linux/arm64 -t {{registry}}/ev-gui:latest ./gui

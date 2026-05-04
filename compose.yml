@@ -3,7 +3,7 @@ services:
     container_name: can-bridge
     platform: linux/arm64
     build:
-      context: ./backend_v3/backend
+      context: ./backend
       dockerfile: Dockerfile
     image: ghcr.io/schommie/ev-can-bridge:latest
     environment:
