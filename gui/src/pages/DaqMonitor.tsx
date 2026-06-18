@@ -14,55 +14,51 @@ export function DaqMonitor() {
 
   const { devices, data, connected, sendCommand } = useDaqSocket(WS_URL);
   
-  interface DaqState {
-    cells1: SensorReading[],
-    cells2: SensorReading[],
-    cells3: SensorReading[],
-    cells4: SensorReading[],
-    cells5: SensorReading[],
-    cells6: SensorReading[],
-    temps1: SensorReading[],
-    temps2: SensorReading[]
-  };
+  const daqSource = data?.source || "DAQ";
+  const graphDescription = `Real-time ${daqSource} feed`;
 
-  const [cellData, setCellData] = useState<DaqState>({
-    cells1: [],
-    cells2: [],
-    cells3: [],
-    cells4: [],
-    cells5: [],
-    cells6: [],
-    temps1: [],
-    temps2: []
-  });
+  const [cells1, setCells1] = useState<SensorReading[]>([]);
+  const [cells2, setCells2] = useState<SensorReading[]>([]);
+  const [cells3, setCells3] = useState<SensorReading[]>([]);
+  const [cells4, setCells4] = useState<SensorReading[]>([]);
+  const [cells5, setCells5] = useState<SensorReading[]>([]);
+  const [cells6, setCells6] = useState<SensorReading[]>([]);
+  const [temps1, setTemps1] = useState<SensorReading[]>([]);
+  const [temps2, setTemps2] = useState<SensorReading[]>([]);
 
   useEffect(() => {
       if (!data) return;
 
-      setCellData((prev) => {
-        console.log("Current cells1 length:", prev.cells1.length);
-        switch (data.cmd) {
-          case "First 24 Cells":
-            console.log("cells1: ", data.sensors.length);
-            return { ...prev, cells1: data.sensors };
-          case "Second 24 Cells":
-            return { ...prev, cells2: data.sensors };
-          case "Third 24 Cells":
-            return { ...prev, cells3: data.sensors};
-          case "Fourth 24 Cells":
-            return { ...prev, cells4: data.sensors};
-          case "Fifth 24 Cells":
-            return { ...prev, cells5: data.sensors};
-          case "Sixth 24 Cells":
-            return { ...prev, cells6: data.sensors};
-          case "First 60 Temps":
-            return { ...prev, temps1: data.sensors };
-          case "Last 60 Temps":
-            return { ...prev, temps2: data.sensors };
-          default:
-            return prev;
-        }
-      });
+      switch (data.cmd) {
+        case "First 24 Cells":
+          console.log("cells1: ", data.sensors);
+          setCells1(data.sensors);
+          break;
+        case "Second 24 Cells":
+          console.log("cells2: ", data.sensors);
+          setCells2(data.sensors);
+          break;
+        case "Third 24 Cells":
+          setCells3(data.sensors);
+          break;
+        case "Fourth 24 Cells":
+          setCells4(data.sensors);
+          break;
+        case "Fifth 24 Cells":
+          setCells5(data.sensors);
+          break;
+        case "Sixth 24 Cells":
+          setCells6(data.sensors);
+          break;
+        case "First 60 Temps":
+          setTemps1(data.sensors);
+          break;
+        case "Last 60 Temps":
+          setTemps2(data.sensors);
+          break;
+        default:
+          break;
+      }
     }, [data]);
 
   return (
@@ -72,43 +68,43 @@ export function DaqMonitor() {
         <div className="xl:col-span-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <LiveTestGraph
             title={"First 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells1}
+            description={graphDescription}
+            sensorData={cells1}
           />
           <LiveTestGraph
             title={"Second 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells2}
+            description={graphDescription}
+            sensorData={cells2}
           />
           <LiveTestGraph
             title={"Third 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells3}
+            description={graphDescription}
+            sensorData={cells3}
           />
           <LiveTestGraph
             title={"Fourth 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells4}
+            description={graphDescription}
+            sensorData={cells4}
           />
           <LiveTestGraph
             title={"Fifth 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells5}
+            description={graphDescription}
+            sensorData={cells5}
           />
           <LiveTestGraph
             title={"Sixth 24 Cells Sensor Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.cells6}
+            description={graphDescription}
+            sensorData={cells6}
           />
           <LiveTestGraph
             title={"First 60 Temps Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.temps1}
+            description={graphDescription}
+            sensorData={temps1}
           />
           <LiveTestGraph
             title={"Last 60 Temps Data"}
-            description={`Real-time ${data?.source || "DAQ"} feed`}
-            sensorData={cellData.temps2}
+            description={graphDescription}
+            sensorData={temps2}
           />
         </div>
 

@@ -1,5 +1,6 @@
 // src/components/Graph.tsx
 import * as React from "react"
+import { memo } from 'react'
 import uPlot from 'uplot';
 import UplotReact from 'uplot-react';
 import 'uplot/dist/uPlot.min.css';
@@ -13,7 +14,7 @@ interface GraphProps {
   sensorData?: { name: string; value: number; unit: string }[];
 }
 
-export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", sensorData }: GraphProps) => {
+export const LiveTestGraph = memo(({ title, description = "Real-time DAQ feed", sensorData }: GraphProps) => {
   const [data, setData] = React.useState<[number[], ...number[][]]>([[]]);
   
   React.useEffect(() => {
@@ -30,13 +31,23 @@ export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", senso
     }
   }, [sensorData]);
 
-  const series = sensorData ? sensorData.map(sensor => ({ label: sensor.name, stroke: "oklch(0.646 0.222 41.116)", width: 2 })) : [];
-  const options: uPlot.Options = {
-    width: 500,
-    height: 300,
-    series: [{}, ...series],
-    axes: [{ stroke: "oklch(0.553 0.013 58.071)" }, { stroke: "oklch(0.553 0.013 58.071)" }],
-  };
+  const options = React.useMemo<uPlot.Options>(() => {
+    const series = sensorData ? sensorData.map(sensor => ({ 
+      label: sensor.name, 
+      stroke: "oklch(0.646 0.222 41.116)", 
+      width: 2 
+    })) : [];
+
+    return {
+      width: 500,
+      height: 300,
+      series: [{}, ...series],
+      axes: [
+        { stroke: "oklch(0.553 0.013 58.071)" }, 
+        { stroke: "oklch(0.553 0.013 58.071)" }
+      ],
+    };
+  }, [sensorData?.length]); 
 
   return (
     <Card className="w-full bg-zinc-950 border-zinc-800">
@@ -57,4 +68,4 @@ export const LiveTestGraph = ({ title, description = "Real-time DAQ feed", senso
       </CardContent>
     </Card>
   );
-};
+});
